@@ -14,22 +14,36 @@
     // MODALS
     // ------------------------------------------------------------------
 
-    function openImportModal() {
-        document.getElementById('importModal')?.classList.remove('hidden');
-        document.getElementById('trpInput')?.focus();
+    let modalOpener = null;
+    function showModal(id) {
+        modalOpener = document.activeElement;
+        const modal = document.getElementById(id);
+        modal?.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        (modal?.querySelector('textarea') || modal?.querySelector('button'))?.focus();
     }
 
+    function hideModal(id) {
+        document.getElementById(id)?.classList.add('hidden');
+        document.body.style.overflow = '';
+        modalOpener?.focus();
+    }
+
+    function openImportModal() { showModal('importModal'); }
     function closeImportModal() {
-        document.getElementById('importModal')?.classList.add('hidden');
+        hideModal('importModal');
         document.getElementById('errorMsg')?.classList.add('hidden');
     }
+    function openInGameView() { showModal('inGameModal'); }
+    function closeInGameView() { hideModal('inGameModal'); }
 
-    function openInGameView() {
-        document.getElementById('inGameModal')?.classList.remove('hidden');
-    }
-
-    function closeInGameView() {
-        document.getElementById('inGameModal')?.classList.add('hidden');
+    function closeMenus(restoreFocus = false) {
+        document.querySelectorAll('.dropdown-group.is-open').forEach(group => {
+            group.classList.remove('is-open');
+            const trigger = group.querySelector('.menu-trigger');
+            trigger?.setAttribute('aria-expanded', 'false');
+            if (restoreFocus) trigger?.focus();
+        });
     }
 
     // ------------------------------------------------------------------
@@ -46,14 +60,19 @@
 
         document.getElementById('tabSimpleBtn')?.classList.toggle('is-active', mode === 'simple');
         document.getElementById('tabInGameBtn')?.classList.toggle('is-active', mode === 'ingame');
+        document.getElementById('tabSimpleBtn')?.setAttribute('aria-pressed', String(mode === 'simple'));
+        document.getElementById('tabInGameBtn')?.setAttribute('aria-pressed', String(mode === 'ingame'));
         toolbar?.classList.toggle('ingame-mode', mode === 'ingame');
         outAbout.classList.toggle('paper-texture', mode === 'simple');
         outAbout.classList.toggle('ingame-parchment-dark', mode === 'ingame');
+        outAbout.classList.toggle('trp-about-ingame', mode === 'ingame');
+        outAbout.classList.toggle('trp-about', mode !== 'ingame');
 
         applyFontSize();
+        fitInGameCanvas(outAbout);
 
         const p = TRP3.state.profile;
-        if (p && p.aboutStripped) {
+        if (p && p.tokens) {
             outAbout.innerHTML = TRP3.formatTRPText(p.aboutStripped, mode);
         }
     }
@@ -64,7 +83,12 @@
         const outAbout = document.getElementById('outAbout');
         const ingame = TRP3.state.viewMode === 'ingame';
 
-        document.getElementById('fontControls')?.classList.toggle('hidden', ingame);
+        const controls = document.getElementById('fontControls');
+        if (controls) {
+            controls.classList.toggle('is-unavailable', ingame);
+            controls.setAttribute('aria-hidden', String(ingame));
+            controls.inert = ingame;
+        }
 
         if (outAbout) outAbout.style.fontSize = ingame ? '' : (TRP3.state.fontSize || '1rem');
         if (ingame) {
@@ -84,14 +108,15 @@
         const btn = document.getElementById('editToggleBtn');
         if (!btn) return;
 
-        if (TRP3.state.editMode) {
-            document.body.classList.add('edit-mode');
-            btn.innerHTML = `<i class="fa-solid fa-check text-green-400 mr-1"></i> Exit Edit Mode`;
-            btn.classList.add('border-[var(--box-border)]');
-        } else {
-            document.body.classList.remove('edit-mode');
-            btn.innerHTML = `<i class="fa-solid fa-pen mr-1"></i> Edit Mode`;
-            btn.classList.remove('border-[var(--box-border)]');
+        btn.setAttribute('aria-pressed', String(TRP3.state.editMode));
+        btn.classList.toggle('is-editing', TRP3.state.editMode);
+        const label = btn.querySelector('span');
+        if (label) label.textContent = TRP3.state.editMode ? 'Done editing' : 'Edit profile';
+        document.body.classList.toggle('edit-mode', TRP3.state.editMode);
+        const status = document.getElementById('profileStatus');
+        if (status) {
+            status.textContent = TRP3.state.editMode ? 'Editing' : 'Viewing';
+            status.classList.toggle('is-editing', TRP3.state.editMode);
         }
     }
 
@@ -232,7 +257,7 @@
         if (attrContainer) {
             attrContainer.innerHTML = vm.attributes.map(attr => `
                     <div class="card-box hover-box">
-                        <img src="${TRP3.getIconUrl(attr.icon)}" class="w-6 h-6 rounded border border-panel flex-shrink-0 editable-icon" data-idx="${attr.icIdx}" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'">
+                        <img crossorigin="anonymous" src="${TRP3.getIconUrl(attr.icon)}" class="w-6 h-6 rounded border border-panel flex-shrink-0 editable-icon" data-idx="${attr.icIdx}" onerror="this.onerror=null;this.src=TRP3.getIconUrl('')">
                         <div class="card-text-wrapper">
                             <span class="card-title-text editable-text" data-idx="${attr.nameIdx}">${esc(attr.name)}</span>
                             <span class="card-value-text editable-text" data-idx="${attr.valIdx}">${esc(attr.value)}</span>
@@ -246,7 +271,7 @@
                 .filter(trait => trait.title || trait.text)
                 .map(trait => `
                     <div class="card-box hover-box">
-                        <img src="${TRP3.getIconUrl(trait.icon)}" class="w-8 h-8 rounded border border-panel shadow flex-shrink-0 editable-icon" data-idx="${trait.icIdx}" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'">
+                        <img crossorigin="anonymous" src="${TRP3.getIconUrl(trait.icon)}" class="w-8 h-8 rounded border border-panel shadow flex-shrink-0 editable-icon" data-idx="${trait.icIdx}" onerror="this.onerror=null;this.src=TRP3.getIconUrl('')">
                         <div class="card-text-wrapper">
                             <span class="card-title-text editable-text" data-idx="${trait.titleIdx}" style="font-size: 13px;">${esc(trait.title)}</span>
                             <span class="card-value-text editable-text" data-idx="${trait.textIdx}" style="color: var(--text-muted);">${esc(trait.text)}</span>
@@ -262,21 +287,20 @@
                 return `
                         <div class="flex items-center w-full gap-1.5 py-1">
                             <span class="text-xs text-yellow-500 flex-1 text-right font-medium leading-normal break-words editable-text" data-idx="${pTrait.leftNameIdx}">${esc(pTrait.leftName)}</span>
-                            <img src="${TRP3.getIconUrl(pTrait.leftIcon)}" class="w-5 h-5 rounded border border-panel shadow flex-shrink-0 editable-icon" data-idx="${pTrait.lIcIdx}">
+                            <img crossorigin="anonymous" src="${TRP3.getIconUrl(pTrait.leftIcon)}" class="w-5 h-5 rounded border border-panel shadow flex-shrink-0 editable-icon" data-idx="${pTrait.lIcIdx}">
                             <div class="w-16 sm:w-24 flex h-2.5 rounded-sm overflow-hidden relative border border-panel shadow-inner bg-black flex-shrink-0 cursor-pointer">
                                 <div class="bg-gradient-to-r from-yellow-700 to-yellow-500 h-full" style="width: ${percent}%"></div>
                                 <div class="bg-gradient-to-r from-blue-700 to-blue-500 h-full" style="width: ${100 - percent}%"></div>
                                 <div class="absolute top-0 bottom-0 w-[2px] bg-white shadow left-0" style="margin-left: ${percent}%"></div>
                             </div>
-                            <img src="${TRP3.getIconUrl(pTrait.rightIcon)}" class="w-5 h-5 rounded border border-panel shadow flex-shrink-0 editable-icon" data-idx="${pTrait.rIcIdx}">
+                            <img crossorigin="anonymous" src="${TRP3.getIconUrl(pTrait.rightIcon)}" class="w-5 h-5 rounded border border-panel shadow flex-shrink-0 editable-icon" data-idx="${pTrait.rIcIdx}">
                             <span class="text-xs text-[#3fc7eb] flex-1 text-left font-medium leading-normal break-words editable-text" data-idx="${pTrait.rightNameIdx}">${esc(pTrait.rightName)}</span>
                         </div>`;
             }).join('');
             pContainer.classList.toggle('hidden', p.personality.length === 0);
         }
 
-        const outAbout = document.getElementById('outAbout');
-        if (outAbout) outAbout.innerHTML = TRP3.formatTRPText(p.aboutStripped, TRP3.state.viewMode);
+        switchViewMode(TRP3.state.viewMode);
     }
 
     function renderInGameView(p, vm) {
@@ -296,7 +320,7 @@
         if (igAttrBox) {
             igAttrBox.innerHTML = vm.attributes.map(attr => `
                     <div class="flex items-center gap-2">
-                        <img src="${TRP3.getIconUrl(attr.icon)}" class="w-6 h-6 rounded shadow border border-[#3a2517]">
+                        <img crossorigin="anonymous" src="${TRP3.getIconUrl(attr.icon)}" class="w-6 h-6 rounded shadow border border-[#3a2517]">
                         <div class="leading-tight">
                             <span class="block text-[10px] font-bold text-[#f8b700] uppercase tracking-wide">${esc(attr.name)}</span>
                             <span class="block text-xs font-semibold text-[#e2d5c5]">${esc(attr.value)}</span>
@@ -310,7 +334,7 @@
                 .filter(trait => trait.title || trait.text)
                 .map(trait => `
                     <div class="flex gap-3 mt-4">
-                        <img src="${TRP3.getIconUrl(trait.icon)}" class="w-8 h-8 rounded shadow border border-[#3a2517] flex-shrink-0">
+                        <img crossorigin="anonymous" src="${TRP3.getIconUrl(trait.icon)}" class="w-8 h-8 rounded shadow border border-[#3a2517] flex-shrink-0">
                         <div class="leading-tight mt-1">
                             <span class="block text-xs font-bold text-[#f8b700] uppercase tracking-wide">${esc(trait.title)}</span>
                             <span class="block text-xs font-medium text-[#c7b299] mt-0.5">${esc(trait.text)}</span>
@@ -325,6 +349,8 @@
     function renderProfile() {
         const p = TRP3.state.profile;
         if (!p || !p.tokens) return;
+        const heading = document.getElementById('profileHeading');
+        if (heading) heading.textContent = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Your profile';
         const vm = deriveViewModel(p);
         renderWebView(p, vm);
         renderInGameView(p, vm);
@@ -379,9 +405,27 @@
         if (handler) handler(el, e);
     }
 
+    function fitInGameCanvas(container, contentWidth) {
+        if (!container) return;
+        if (contentWidth === undefined) {
+            const style = getComputedStyle(container);
+            contentWidth = container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        }
+        if (contentWidth <= 0) return; // Hidden dialogs are measured on opening.
+        container.style.setProperty('--trp-ingame-scale', String(Math.min(1.25, contentWidth / 550)));
+    }
+
     function init() {
         if (initialized) return;
         initialized = true;
+
+        const canvasObserver = new ResizeObserver(entries => {
+            for (const entry of entries) fitInGameCanvas(entry.target, entry.contentRect.width);
+        });
+        for (const id of ['outAbout', 'igAbout']) {
+            const container = document.getElementById(id);
+            if (container) canvasObserver.observe(container);
+        }
 
         document.getElementById('fontSlider')?.addEventListener('input', function (e) {
             const val = parseFloat(e.target.value).toFixed(1);
@@ -396,10 +440,35 @@
         });
 
         document.addEventListener('dblclick', handleDoubleClick);
-        document.addEventListener('click', dispatchAction);
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('[data-action="toggle-menu"]')) closeMenus();
+            dispatchAction(e);
+        });
+        document.addEventListener('keydown', (e) => {
+            const modal = document.querySelector('[role="dialog"]:not(.hidden)');
+            if (e.key === 'Escape') {
+                closeMenus(true);
+                if (modal?.id === 'importModal') closeImportModal();
+                if (modal?.id === 'inGameModal') closeInGameView();
+            }
+            if (e.key === 'Tab' && modal) {
+                const controls = [...modal.querySelectorAll('button, textarea, input, a[href], [tabindex="0"]')]
+                    .filter(el => el.getClientRects().length && !el.disabled);
+                const first = controls[0], last = controls[controls.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+            }
+        });
     }
 
     // Action registrations owned by the view layer.
+    TRP3.actions['toggle-menu'] = (el) => {
+        const group = el.closest('.dropdown-group');
+        const shouldOpen = !group.classList.contains('is-open');
+        closeMenus();
+        group.classList.toggle('is-open', shouldOpen);
+        el.setAttribute('aria-expanded', String(shouldOpen));
+    };
     TRP3.actions['open-import'] = openImportModal;
     TRP3.actions['close-import'] = closeImportModal;
     TRP3.actions['open-ingame'] = openInGameView;

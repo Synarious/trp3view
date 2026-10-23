@@ -13,7 +13,7 @@
     // Icons live on Wowhead's zamimg CDN, keyed by icon *name* and
     // case-insensitive, so any casing works.
     const ICON_CDN = 'https://wow.zamimg.com/images/wow/icons/large/';
-    const DEFAULT_ICON = ICON_CDN + 'inv_misc_questionmark.jpg';
+    const DEFAULT_ICON = TRP3.bundledImages['assets/icons/questionmark.jpg'];
 
     // Interface art (banners, backgrounds, frames, atlases) comes from the
     // Gethe/wow-ui-textures git mirror, which converted Blizzard's .blp files
@@ -29,11 +29,11 @@
     // known-good image URL as a stopgap. Keys are the path normalised to
     // lower-case with Interface\ stripped and no extension.
     // See README > "Textures missing from the mirror".
-    // NOTE: use the direct /images/ URL, NOT Special:FilePath - the wiki
-    // returns 403 to browser user-agents on the redirect endpoint.
+    // Bundle artwork whose remote hosts block browser export requests.
+    // See README > Bundled artwork sources for provenance.
     const TEXTURE_OVERRIDES = {
         'glues/loadingscreens/expansion09/main/loadscreen_mappirate':
-            'https://warcraft.wiki.gg/images/Plunderstorm_loading_screen.jpg',
+            'assets/textures/loadscreen-mappirate.webp',
     };
 
     // Normalises a texture path: forward slashes, no leading slash, no
@@ -49,7 +49,8 @@
     function getTextureOverride(texturePath) {
         if (!texturePath || typeof texturePath !== 'string') return null;
         const clean = normalizeTexturePath(texturePath);
-        return (clean && TEXTURE_OVERRIDES[clean.toLowerCase()]) || null;
+        const path = (clean && TEXTURE_OVERRIDES[clean.toLowerCase()]) || null;
+        return TRP3.bundledImages?.[path] || path;
     }
 
     // Resolves a WoW icon name/path to a browser-loadable icon URL.
@@ -64,6 +65,8 @@
         // Extract base filename without extension
         let filename = cleanPath.split('/').pop().replace(/\.(png|blp|tga|jpg|jpeg)$/i, '');
 
+        // The legacy personality preset refers to a nonexistent mask icon.
+        if (filename === 'inv_misc_mask_02') return TRP3.bundledImages['assets/icons/deceitful.jpg'];
         return `${ICON_CDN}${filename}.jpg`;
     }
 
@@ -79,7 +82,7 @@
         const clean = normalizeTexturePath(texturePath);
         if (!clean) return null;
 
-        const override = TEXTURE_OVERRIDES[clean.toLowerCase()];
+        const override = getTextureOverride(texturePath);
         if (override) return override;
 
         return `${TEXTURE_CDN}${clean}.PNG`;
@@ -113,6 +116,13 @@
     // Strips characters that could break out of an HTML attribute.
     function attrUrl(url) {
         return String(url == null ? '' : url).replace(/["'<>]/g, '');
+    }
+
+    // These hosts explicitly allow anonymous CORS. Loading them this way
+    // keeps displayed pixels origin-clean and reusable by the PNG exporter.
+    function imageCorsAttribute(source) {
+        return /^https:\/\/(?:wow\.zamimg\.com|cdn\.jsdelivr\.net|raw\.githubusercontent\.com)\//i.test(source)
+            ? ' crossorigin="anonymous"' : '';
     }
 
     // Inline onerror handler: swap to `fallback` once, then hide the element.
@@ -191,8 +201,10 @@
 
     // --- IN-GAME VIEW: preserves images, custom colours and exact linebreaks. ---
     function formatInGameView(text) {
-        text = parseInlineMarkup(text, 'text-blue-400');
+        // Colours are resolved after block generation so colour codes crossing
+        // a heading boundary cannot create invalid, browser-repaired HTML.
 
+        let bannerOpen = false;
         text = text.replace(/\{img:([^:}]+)(?::(\d+))?(?::(\d+))?(?::([lrc]))?\}/gi, function (m, path, w, h, align) {
             // The addon defaults an image's size to 128x128 and, per its
             // IMAGE_PATTERN handling, its alignment to "center" when omitted.
@@ -201,35 +213,57 @@
 
             const a = (align || '').toLowerCase();
             let pos;
-            if (a === 'l') pos = 'float-left mr-3 mb-2';
-            else if (a === 'r') pos = 'float-right ml-3 mb-2';
-            else pos = 'block mx-auto my-2';
+            if (a === 'l') pos = 'trp-ig-left';
+            else if (a === 'r') pos = 'trp-ig-right';
+            else pos = 'trp-ig-center';
 
             const { src, fallback } = resolveImageUrl(path);
             const url = attrUrl(src);
             const onerr = fallbackHandler(src, fallback);
 
-            return `<img src="${url}" width="${w}" height="${h}" style="width:${w}px;height:${h}px;" class="trp-ig-img max-w-full ${pos}" onerror="${onerr}">`;
+            const image = `<img${imageCorsAttribute(src)} src="${url}" width="${w}" height="${h}" style="width:${w}px;height:${h}px;" class="trp-ig-img ${pos}" onerror="${onerr}">`;
+            // A frame-wide side-aligned image is a backdrop in SimpleHTML:
+            // text continues over it, rather than being pushed below a float.
+            const previousBannerEnd = bannerOpen ? '</div>' : '';
+            bannerOpen = false;
+            if (a && a !== 'c' && w >= 550) {
+                bannerOpen = true;
+                return `${previousBannerEnd}<div class="trp-ig-banner" style="min-height:${h}px"><span class="trp-ig-backdrop">${image}</span>`;
+            }
+            return previousBannerEnd + image;
         });
+        if (bannerOpen) text += '</div>';
 
         text = text.replace(/\{h([1-3])(?::([crl]))?\}([\s\S]*?)\{\/h\1\}/gi, function (match, level, align, content) {
             const innerText = typeof content === 'string' ? content : (typeof align === 'string' ? align : '');
             // In the WoW client, h1/h2 titles are centered but h3 sub-headings are left-aligned.
             const fallback = level === '3' ? 'text-left' : 'text-center';
-            return `<h${level} class="block w-full ${alignmentClass(align, fallback)}">${innerText.trim()}</h${level}>`;
+            return `<h${level} class="${alignmentClass(align, fallback)}">${innerText.trim()}</h${level}>`;
         });
 
         text = text.replace(/\{p(?::([crl]))?\}([\s\S]*?)\{\/p\}/gi, function (match, align, content) {
             const innerText = typeof content === 'string' ? content : (typeof align === 'string' ? align : '');
-            return `<div class="block w-full mb-2 ${alignmentClass(align, 'text-left')}">${innerText.trim()}</div>`;
+            return `<div class="trp-ig-paragraph ${alignmentClass(align, 'text-left')}">${innerText.trim()}</div>`;
         });
 
-        text = text.replace(/\n*(<\/?(?:h1|h2|h3|p|div)[^>]*>)\n*/gi, '$1');
+        // SimpleHTML ignores one newline immediately after a block tag,
+        // but retains authored blank lines used to position text over art.
+        text = text.replace(/(<\/?(?:h1|h2|h3|p|div)[^>]*>)\n/gi, '$1');
         text = text.replace(/\n/g, '<br>');
+        text = text.replace(/\{link\*(.*?)\*(.*?)\}/gi,
+            '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>');
+        let color = '';
+        text = text.split(/(\{col:[0-9a-fA-F]{6}\}|\{\/col\}|<[^>]+>)/gi).map(part => {
+            const match = part.match(/^\{col:([0-9a-fA-F]{6})\}$/i);
+            if (match) { color = match[1]; return ''; }
+            if (/^\{\/col\}$/i.test(part)) { color = ''; return ''; }
+            if (!part || part.startsWith('<')) return part;
+            return color ? `<span style="color:#${color}">${part}</span>` : part;
+        }).join('');
 
         // Content is centred in a 550px column, matching the in-game About
         // frame width, so images and text keep the client's proportions.
-        return `<div class="trp-ingame-body w-full relative flow-root">${text}</div>`;
+        return `<div class="trp-ingame-body">${text}</div>`;
     }
 
     // Formats TRP3 markup for the given view mode ('simple' | 'ingame').

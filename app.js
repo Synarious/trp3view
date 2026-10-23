@@ -82,6 +82,7 @@
 
             if (outputArea) outputArea.classList.remove('hidden');
             if (secondaryNav) secondaryNav.classList.remove('hidden');
+            document.getElementById('welcomeScreen')?.classList.add('hidden');
             TRP3.ui.closeImportModal();
 
             const txtInput = document.getElementById('trpInput');
@@ -93,8 +94,7 @@
                 errorMsg.textContent = "Error decoding profile: " + err.message;
                 errorMsg.classList.remove('hidden');
             }
-            if (outputArea) outputArea.classList.add('hidden');
-            if (secondaryNav) secondaryNav.classList.add('hidden');
+            // Keep the current profile visible when a replacement import fails.
         }
     }
 
@@ -184,45 +184,139 @@
         navigator.clipboard.writeText(md).then(() => alert('Discord Markdown copied to clipboard!'));
     }
 
-    function exportImage() {
+    // Reuse the actual displayed resource (including responsive currentSrc),
+    // rather than forcing an independent network request for every export.
+    const exportImageCache = new Map();
+    function rememberExportImage(source, data) {
+        if (exportImageCache.size >= 64) exportImageCache.delete(exportImageCache.keys().next().value);
+        exportImageCache.set(source, data);
+        return data;
+    }
+
+    async function readImageForExport(image) {
+        if (!image.complete && image.decode) {
+            try { await image.decode(); } catch (_) { /* Try embedded or cached artwork next. */ }
+        }
+        const source = image.currentSrc || image.src;
+        if (!source) return null;
+        if (source.startsWith('data:')) return source;
+        if (exportImageCache.has(source)) return exportImageCache.get(source);
+        if (image.complete && image.naturalWidth && image.naturalHeight) {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = image.naturalWidth;
+                canvas.height = image.naturalHeight;
+                canvas.getContext('2d').drawImage(image, 0, 0);
+                const data = canvas.toDataURL('image/png');
+                if (data.startsWith('data:image/')) return rememberExportImage(source, data);
+            } catch (_) { /* Non-CORS images require an embedded source below. */ }
+        }
+        const pathname = new URL(source, document.baseURI).pathname.toLowerCase();
+        const bundledPath = Object.keys(TRP3.bundledImages || {}).find(path => pathname.endsWith(path.toLowerCase()));
+        const legacyBanner = pathname.endsWith('/plunderstorm_loading_screen.jpg');
+        const embedded = TRP3.bundledImages?.[bundledPath || (legacyBanner ? 'assets/textures/loadscreen-mappirate.webp' : '')];
+        if (embedded) return rememberExportImage(source, embedded);
+        try {
+            const response = await fetch(source, { mode: 'cors', credentials: 'same-origin', cache: 'force-cache' });
+            if (!response.ok) return null;
+            const blob = await response.blob();
+            if (!blob.type.startsWith('image/')) return null;
+            const data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+            return rememberExportImage(source, data);
+        } catch (_) { return null; }
+    }
+    TRP3.images = { readForExport: readImageForExport };
+
+    let imageExportInProgress = false;
+
+    async function exportImage() {
         const p = TRP3.state.profile;
         if (!p || !p.firstName) return alert("Please import a profile first.");
+        if (imageExportInProgress) return;
         const target = document.getElementById('outputArea');
-        const mainNav = document.querySelector('nav');
-        const secNav = document.getElementById('secondaryNav');
+        const buttons = [...document.querySelectorAll('[data-action="export-image"]')];
+        let downloadUrl;
+        let exportHost;
+        imageExportInProgress = true;
+        buttons.forEach(button => { button.disabled = true; button.setAttribute('aria-busy', 'true'); });
 
-        if (mainNav) mainNav.style.display = 'none';
-        if (secNav) secNav.style.display = 'none';
-        window.scrollTo(0, 0);
+        try {
+            if (!window.htmlToImage) throw new Error('The PNG export library did not load. Refresh the page and try again.');
+            await document.fonts.ready;
+            // Cross-origin font stylesheets may be inaccessible. Preserve embedded
+            // fonts where possible, and still export with system fonts otherwise.
+            let fontEmbedCSS = '';
+            try { fontEmbedCSS = await htmlToImage.getFontEmbedCSS(target); }
+            catch (error) { console.warn('PNG export: using available system fonts.', error); }
 
-        const originalPadding = target.style.padding;
-        target.style.padding = '40px';
+            const placeholder = 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/%3E';
+            const snapshot = target.cloneNode(true);
+            const originalImages = [...target.querySelectorAll('img')];
+            const imagePairs = new Map([...snapshot.querySelectorAll('img')].map((image, index) => [image, originalImages[index]]));
+            snapshot.classList.add('png-export');
+            snapshot.querySelectorAll('[data-export-ignore="true"], #aboutToolbar').forEach(node => node.remove());
+            const imageRequests = new Map();
+            // The library waits for cloned <img> nodes before applying its own
+            // missing-image fallback. Embed safe sources first to avoid rejection
+            // during that earlier cloning step (including inline onerror retries).
+            const images = [...snapshot.querySelectorAll('img')].map(image => {
+                const original = imagePairs.get(image);
+                const source = original?.currentSrc || (original?.getAttribute('src') ? original.src : '');
+                image.removeAttribute('onerror');
+                image.removeAttribute('srcset');
+                image.removeAttribute('loading');
+                image.removeAttribute('crossorigin');
+                image.src = placeholder;
+                if (!source) return Promise.resolve();
+                if (!imageRequests.has(source)) {
+                    imageRequests.set(source, readImageForExport(original).then(data => data || placeholder));
+                }
+                return imageRequests.get(source).then(async data => {
+                    image.src = data;
+                    try { await image.decode(); }
+                    catch (_) { image.src = placeholder; await image.decode(); }
+                });
+            });
+            await Promise.all(images);
+            exportHost = document.createElement('div');
+            exportHost.setAttribute('aria-hidden', 'true');
+            exportHost.style.cssText = 'position:fixed;left:-100000px;top:0;pointer-events:none;';
+            snapshot.style.width = '1280px';
+            snapshot.style.maxWidth = 'none';
+            exportHost.appendChild(snapshot);
+            document.body.appendChild(exportHost);
 
-        const restoreChrome = () => {
-            target.style.padding = originalPadding;
-            if (mainNav) mainNav.style.display = '';
-            if (secNav) secNav.style.display = '';
-        };
-
-        const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--page-grad-edge').trim() || '#0a0604';
-
-        htmlToImage.toPng(target, {
-            backgroundColor: bgColor,
-            pixelRatio: 2,
-            filter: (node) => {
-                return !(node.getAttribute && node.getAttribute('data-export-ignore') === 'true');
-            }
-        }).then(dataUrl => {
+            const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--page-grad-edge').trim() || '#0a0604';
+            const blob = await htmlToImage.toBlob(snapshot, {
+                backgroundColor: bgColor,
+                pixelRatio: 2,
+                fontEmbedCSS,
+                // Failed artwork must not abort the entire profile export.
+                imagePlaceholder: placeholder,
+                filter: node => !(node.getAttribute && node.getAttribute('data-export-ignore') === 'true')
+            });
+            if (!blob) throw new Error('The browser could not create a PNG image.');
+            downloadUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.download = `${p.firstName}_trp3.png`;
-            link.href = dataUrl;
+            link.href = downloadUrl;
             link.click();
-            restoreChrome();
-        }).catch(err => {
-            restoreChrome();
-            console.error("Export Error:", err);
-            alert("Failed to export image: " + err.message);
-        });
+        } catch (error) {
+            console.error('Export Error:', error);
+            alert('Failed to export image: ' + (error.message || 'The browser could not render the profile image.'));
+        } finally {
+            // No live layout changes: exports retain the current canvas scale,
+            // navigation state, padding, and scroll position, including on failure.
+            exportHost?.remove();
+            if (downloadUrl) setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+            buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-busy'); });
+            imageExportInProgress = false;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -242,6 +336,5 @@
         TRP3.ui.init();
         TRP3.applyTheme(localStorage.getItem('trp3_theme') || 'parchment');
         TRP3.ui.renderHistory();
-        TRP3.ui.openImportModal();
     });
 })();

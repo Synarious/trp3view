@@ -8,6 +8,13 @@ WoW client.
 No build step. Open `index.html` directly.
 
 
+## Interface
+
+The welcome screen introduces the import workflow. `design.css` contains the
+responsive interface styling; theme palettes remain in `theme.js`. Menus open
+with click or keyboard activation. Dialogs support Escape, keep keyboard focus
+inside while open, and restore focus on close.
+
 ## File layout
 
 Scripts are plain (non-module) files that share one global namespace, `window.TRP3`.
@@ -15,6 +22,7 @@ Scripts are plain (non-module) files that share one global namespace, `window.TR
 
 | Order | File | Responsibility |
 |-------|------|----------------|
+| 0 | `assets.js` | Embedded essential artwork for browser and direct-file export |
 | 1 | `theme.js`  | Class themes, `TRP3.defaults`, `applyTheme`, shared state/actions bootstrap |
 | 2 | `format.js` | **Texture/icon resolution** + TRP3 markup formatter (Simple/In-Game) |
 | 3 | `core.js`   | LibSerialize token codec + token stream -> profile object parser |
@@ -35,7 +43,7 @@ load those paths, so they are mapped to two different public hosts.
 
 ```js
 const ICON_CDN    = 'https://wow.zamimg.com/images/wow/icons/large/';
-const DEFAULT_ICON = ICON_CDN + 'inv_misc_questionmark.jpg';
+const DEFAULT_ICON = TRP3.bundledImages['assets/icons/questionmark.jpg'];
 
 const TEXTURE_CDN = 'https://cdn.jsdelivr.net/gh/Gethe/wow-ui-textures@live/';
 ```
@@ -98,13 +106,14 @@ for these:
 ```js
 const TEXTURE_OVERRIDES = {
   'glues/loadingscreens/expansion09/main/loadscreen_mappirate':
-      'https://warcraft.wiki.gg/images/Plunderstorm_loading_screen.jpg',
+      'assets/textures/loadscreen-mappirate.webp',
 };
 ```
 
-Each override points at the **direct `/images/<File>` URL, not
-`Special:FilePath`** - the wiki returns `403` to browser user-agents on the
-redirect endpoint (which would make the `<img>` fall back to the question mark).
+The map banner is bundled from its game texture to avoid the wiki host's
+hotlink and CORS restrictions. `assets.js` supplies embedded image data so the
+same artwork also exports when opening `index.html` directly via `file://`.
+See "Bundled artwork sources" below for artwork provenance.
 
 * Keys are the path **normalised to lower-case**, `Interface\` stripped, no
   extension (that's `normalizeTexturePath`).
@@ -192,3 +201,50 @@ it, resolve the index to its `bgFile` and render it with `getTextureUrl` (it is 
 full interface texture, not an icon). Note this is separate from the About text's
 inline `{img:}` images, which *are* rendered (including the loading-screen banner
 via the override above).
+
+## In-game layout verification
+
+In-game formatting keeps a 550px authored canvas with 12px body text, explicit
+line breaks, unpadded side images, and stretched image dimensions (including
+thin decorative dividers). Frame-wide side images sit behind the following text
+so authored blank lines can place headings over banners. In-game typography is
+isolated from Simple View; headings have no automatically added border.
+The whole canvas displays at 125% scale where space permits, matching the
+reference's 688px artwork and 15px body text. Narrower panels scale the entire
+canvas down together rather than stretching the text column or reflowing it.
+
+Run the regressions with `node --test tests/*.test.cjs`.
+
+PNG export captures a separate snapshot, embeds available artwork, and leaves
+missing images blank instead of aborting the download. Font embedding falls
+back to system fonts when a remote stylesheet is unavailable. Export does not
+change the live profile's layout or scroll position. Banner sections reserve
+the authored image height so the next section cannot overlap the artwork.
+
+PNG exports use a fixed 1280px composition rendered at 2x resolution, with 32px
+outer margins and a consistent sidebar. View tabs, font controls, and editing
+controls are removed from the snapshot. Section icons are inline SVG and do
+not depend on Font Awesome embedding. The map banner, replacement Deceitful
+icon, and question-mark fallback are bundled and embedded as data URLs.
+
+Export first captures pixels from the original displayed images, then reuses a
+bounded cache of embedded data. Supported WoW image CDNs load with anonymous
+CORS so those pixels remain readable. A legacy wiki banner URL resolves to the
+bundled game artwork if its displayed pixels are not origin-clean. Only images
+without readable pixels or embedded data require a cache-preferring fetch.
+
+The app bar contains Recent profiles, Appearance, and Import profile. After an
+import, the profile header shows the character name, edit status, full-screen
+preview, and an Export profile menu with PNG, Discord, and TRP3 options. The
+About panel switches between Reader view and In-game style. Export menus close
+with Escape and return keyboard focus to their trigger.
+
+## Bundled artwork sources
+
+Artwork is embedded in `assets.js`; the names below are resource keys, not
+separate files. This keeps essential images independent of remote CORS and
+hotlink restrictions. All World of Warcraft artwork belongs to Blizzard Entertainment.
+
+- `textures/loadscreen-mappirate.webp`: game texture `Interface/GLUES/LOADINGSCREENS/Expansion09/Main/LoadScreen_MapPirate`, FileDataID 5580542, retrieved from `https://wago.tools/api/casc/5580542`. Converted from BLP to WebP at 1600px width.
+- `icons/deceitful.jpg`: `ability_rogue_disguise`, retrieved from `https://wow.zamimg.com/images/wow/icons/large/ability_rogue_disguise.jpg`. Replaces the unavailable legacy `inv_misc_mask_02` personality icon.
+- `icons/questionmark.jpg`: `inv_misc_questionmark`, retrieved from `https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg`.

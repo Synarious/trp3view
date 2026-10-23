@@ -16,18 +16,18 @@
     <style>
         :root {
             /* Default TRP3 Parchment Theme */
-            --page-grad-center: #2e2014;
-            --page-grad-edge: #0a0604;
-            --panel-bg: #2a1d12;
+            --page-grad-center: #26251f;
+            --page-grad-edge: #101210;
+            --panel-bg: #20221e;
             --panel-border: #0f0a06;
-            --sidebar-bg: #22160d;
+            --sidebar-bg: #171a17;
             --text-primary: #e2d5c5;
-            --text-accent: #ffd100;
+            --text-accent: #dbb773;
             --text-muted: #c7b299;
-            --box-bg: #120b06;
-            --box-border: #382618;
-            --box-hover: #4a3420;
-            --about-bg: #160e09;
+            --box-bg: #181b17;
+            --box-border: #35382e;
+            --box-hover: #30362b;
+            --about-bg: #191c18;
         }
 
         body { 
@@ -152,26 +152,8 @@
         .trp-about a { color: var(--text-accent); text-decoration: underline; }
         .trp-about a:hover { filter: brightness(1.2); }
 
-        /* In-Game (WoW client) About typography */
-        .trp-about-ingame {
-            font-family: Georgia, "Times New Roman", serif;
-            color: #d8c8a4;
-            font-size: 15px;
-            line-height: 1.45;
-        }
-        .trp-about-ingame::after { content: ""; display: table; clear: both; }
-        .trp-about-ingame h1 { font-size: 1.6em; font-weight: 700; margin: 0.4em 0 0.2em; color: #f8b700; text-shadow: 0 1px 2px #000; }
-        .trp-about-ingame h2 { font-size: 1.35em; font-weight: 700; margin: 0.5em 0 0.25em; color: #f0e6d2; text-shadow: 0 1px 2px #000; }
-        .trp-about-ingame h3 { font-size: 1.1em; font-weight: 700; margin: 0.7em 0 0.2em; color: #3fc7eb; }
-        .trp-about-ingame p { margin: 0.35em 0; }
-        .trp-about-ingame a { color: #4fc3f7; text-decoration: underline; }
-        /* Images are painted at their authored width/height (as the addon's
-           <img width height> does); cover trims when the source aspect
-           differs, matching how the client frames banner art. */
-        .trp-ig-img { object-fit: cover; }
-        /* The about column is pinned to the in-game frame width (550px) and
-           centred, so text/image proportions match the client. */
-        .trp-ingame-body { max-width: 550px; margin-left: auto; margin-right: auto; }
+        /* In-game typography and image layout live in design.css. */
+        .trp-about-ingame::after,
         .trp-ingame-body::after { content: ""; display: table; clear: both; }
 
         /* Edit Mode Styles */
@@ -246,36 +228,32 @@
         .dropdown-content { display: none; }
         .dropdown-group:hover .dropdown-content { display: flex; }
 
-        * { outline: 0 !important; outline-offset: 0 !important; }
+        :focus-visible { outline: 2px solid var(--text-accent); outline-offset: 4px; }
     </style>
+    <link rel="stylesheet" href="design.css">
 </head>
 <body class="flex flex-col items-center">
 
-    <!-- Top Navigation Bar -->
-    <nav class="w-full bg-[var(--sidebar-bg)] border-b border-[var(--box-border)] shadow-lg z-40 sticky top-0" data-export-ignore="true">
-        <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-2">
-            <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 fill-[var(--text-accent)]" viewBox="0 0 512 512"><path d="M336 0c-26.5 0-48 21.5-48 48v288c0 26.5 21.5 48 48 48h128c26.5 0 48-21.5 48-48V48c0-26.5-21.5-48-48-48H336zm128 336H336V48h128v288zM0 128c0-26.5 21.5-48 48-48h192v48H48v336h128V304h48v160c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V128z"/></svg>
-                <span class="font-bold text-[var(--text-primary)] tracking-wide">TRP3 Decoder</span>
+    <!-- App navigation: import, recent profiles, and appearance. -->
+    <nav class="appbar" aria-label="Main navigation" data-export-ignore="true">
+        <div class="appbar-inner">
+            <div class="app-brand">
+                <span class="brand-mark"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-3-2-7-2-10-1v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1zm0 0v15"/></svg></span>
+                <div><span class="brand-title">TRP3 <span>Profile Viewer</span></span><p class="brand-caption">Your character, beyond Azeroth</p></div>
             </div>
-
-            <div class="flex items-center gap-6 text-sm font-medium">
-                <button data-action="open-import" class="trp-btn px-4 py-1.5 rounded font-bold shadow-md flex items-center gap-2 transition duration-200">
-                    <i class="fa-solid fa-file-import"></i> Import Profile
-                </button>
-
-                <div class="dropdown-group relative py-2 cursor-pointer">
-                    <span class="text-[var(--text-primary)] hover:text-[var(--text-accent)] transition">History ▼</span>
-                    <div class="dropdown-content absolute top-full left-0 bg-[var(--panel-bg)] border border-[var(--panel-border)] shadow-xl rounded w-56 flex-col z-50">
+            <div class="app-navigation">
+                <div class="dropdown-group nav-recent">
+                    <button type="button" data-action="toggle-menu" aria-expanded="false" aria-controls="historyMenu" class="menu-trigger"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Recent profiles</span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+                    <div id="historyMenu" class="dropdown-content absolute top-full left-0 bg-[var(--panel-bg)] border border-[var(--panel-border)] shadow-xl rounded w-56 flex-col z-50">
                         <div id="historyList" class="max-h-48 overflow-y-auto">
                             <p class="px-4 py-3 text-xs text-[var(--text-muted)] italic">No history yet.</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="dropdown-group relative py-2 cursor-pointer">
-                    <span class="text-[var(--text-primary)] hover:text-[var(--text-accent)] transition">Theme ▼</span>
-                    <div class="dropdown-content absolute top-full left-0 bg-[var(--panel-bg)] border border-[var(--panel-border)] shadow-xl rounded w-44 flex-col z-50 max-h-96 overflow-y-auto">
+                <div class="dropdown-group nav-appearance">
+                    <button type="button" data-action="toggle-menu" aria-expanded="false" aria-controls="themeMenu" class="menu-trigger"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18V3z"/></svg><span>Appearance</span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+                    <div id="themeMenu" class="dropdown-content absolute top-full left-0 bg-[var(--panel-bg)] border border-[var(--panel-border)] shadow-xl rounded w-44 flex-col z-50 max-h-96 overflow-y-auto">
                         <a href="#" data-action="apply-theme" data-theme="parchment" class="px-4 py-2 text-[var(--text-primary)] hover:bg-[var(--box-hover)] hover:text-white border-b border-[var(--box-border)]">Parchment (Default)</a>
                         <a href="#" data-action="apply-theme" data-theme="death knight" class="px-4 py-2 text-[#C41E3A] hover:bg-[var(--box-hover)]">Death Knight</a>
                         <a href="#" data-action="apply-theme" data-theme="demon hunter" class="px-4 py-2 text-[#A330C9] hover:bg-[var(--box-hover)]">Demon Hunter</a>
@@ -294,55 +272,92 @@
                         <a href="#" data-action="apply-theme" data-theme="horde" class="px-4 py-2 text-[#ff4d4d] hover:bg-[var(--box-hover)]">Horde</a>
                     </div>
                 </div>
+                <button type="button" data-action="open-import" class="header-import"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 16v5h16v-5"/></svg>Import profile</button>
             </div>
         </div>
     </nav>
 
-    <!-- Secondary Navigation Bar -->
-    <div id="secondaryNav" class="w-full bg-[#120b06] border-b border-[var(--panel-border)] shadow-md z-30 hidden" data-export-ignore="true">
-        <div class="max-w-7xl mx-auto flex items-center justify-end px-6 py-2 gap-4">
-            <button data-action="open-ingame" class="text-xs font-bold text-[#e6cc80] hover:text-white px-3 py-1 rounded border border-[#e6cc80] hover:bg-[#e6cc80]/10 transition"><i class="fa-solid fa-gamepad mr-1"></i> In-Game View</button>
-            <button data-action="toggle-edit" id="editToggleBtn" class="text-xs font-bold text-[var(--text-muted)] hover:text-white px-3 py-1 rounded border border-transparent hover:border-[var(--box-border)] transition"><i class="fa-solid fa-pen mr-1"></i> Edit Mode</button>
-            <button data-action="export-trp3" class="text-xs font-bold text-green-400 hover:text-green-300 px-3 py-1 rounded border border-transparent hover:border-green-800 transition"><i class="fa-solid fa-code mr-1"></i> Export as TRP3 Import</button>
-            <div class="h-4 w-px bg-[var(--box-border)] mx-1"></div>
-            <button data-action="export-image" class="text-xs font-bold text-[var(--text-muted)] hover:text-white px-3 py-1 rounded border border-transparent hover:border-[var(--box-border)] transition"><i class="fa-solid fa-image mr-1"></i> PNG</button>
-            <button data-action="export-discord" class="text-xs font-bold text-[var(--text-muted)] hover:text-white px-3 py-1 rounded border border-transparent hover:border-[var(--box-border)] transition"><i class="fa-brands fa-discord mr-1"></i> Discord</button>
+    <!-- Loaded profile context and actions. -->
+    <header id="secondaryNav" class="profile-header hidden" data-export-ignore="true">
+        <div class="profile-header-inner">
+            <div class="profile-heading">
+                <p class="profile-eyebrow">CHARACTER PROFILE</p>
+                <div class="profile-title-row"><h1 id="profileHeading">Your profile</h1><span id="profileStatus" class="profile-status">Viewing</span></div>
+            </div>
+            <div class="profile-actions" aria-label="Profile actions">
+                <button type="button" data-action="open-ingame" class="toolbar-button" aria-label="Open full-screen in-game preview"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg><span class="preview-full-label">Full-screen preview</span><span class="preview-short-label">Preview</span></button>
+                <button type="button" data-action="toggle-edit" id="editToggleBtn" class="toolbar-button" aria-pressed="false"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5-11 11H4v-5L15 4zm-2 2 5 5"/></svg><span>Edit profile</span></button>
+                <div class="dropdown-group export-group">
+                    <button type="button" data-action="toggle-menu" aria-expanded="false" aria-controls="exportMenu" class="menu-trigger export-trigger"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v5h14v-5"/></svg><span>Export profile</span><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+                    <div id="exportMenu" class="dropdown-content export-menu">
+                        <p class="dropdown-heading">SAVE OR SHARE</p>
+                        <button type="button" data-action="export-image" class="export-option"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 5 5 3-3 4 4"/></svg><span><strong>Download PNG</strong><small>Save a profile image</small></span></button>
+                        <button type="button" data-action="export-discord" class="export-option"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></svg><span><strong>Copy for Discord</strong><small>Formatted text for your server</small></span></button>
+                        <button type="button" data-action="export-trp3" class="export-option"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5m8-10 5 5-5 5M14 4l-4 16"/></svg><span><strong>Copy TRP3 string</strong><small>Import this profile back into WoW</small></span></button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
+    </header>
 
     <!-- Import Modal Overlay -->
-    <div id="importModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] hidden px-4">
+    <div id="importModal" role="dialog" aria-modal="true" aria-labelledby="importHeading" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] hidden px-4">
         <div class="bg-[var(--panel-bg)] border-2 border-[var(--box-border)] rounded-lg p-6 max-w-2xl w-full shadow-2xl relative">
-            <button data-action="close-import" class="absolute top-4 right-4 text-[var(--text-muted)] hover:text-white transition">
+            <button data-action="close-import" aria-label="Close import dialog" class="absolute top-4 right-4 text-[var(--text-muted)] hover:text-white transition">
                 <i class="fa-solid fa-xmark text-2xl"></i>
             </button>
             
-            <h2 class="text-2xl font-bold text-[var(--text-accent)] mb-4 flex items-center gap-3">
+            <h2 id="importHeading" class="text-2xl font-bold text-[var(--text-accent)] mb-4 flex items-center gap-3">
                 <i class="fa-solid fa-file-import"></i> Import Profile
             </h2>
             
             <div class="bg-[var(--box-bg)] border border-[var(--box-border)] rounded p-5 mb-5 text-[var(--text-primary)] text-sm shadow-inner">
                 <p class="font-bold text-[var(--text-accent)] mb-2">How to export your TRP3 Profile:</p>
                 <ol class="list-decimal pl-5 text-[var(--text-muted)] space-y-1.5">
-                    <li>Open <strong>Total RP 3</strong> in-game and view your character profile.</li>
-                    <li>Click the <strong>More actions</strong> button <span class="opacity-70">(the gear/menu icon)</span>.</li>
-                    <li>Select <strong>Export profile</strong>.</li>
-                    <li>Copy the entire string provided and paste it into the box below.</li>
+                    <li>Open <strong>Total RP 3</strong> in-game with "/trp3 open" without a target.</li>
+                    <li>Click <strong>"Profiles"</strong> on the left sidebar.</li>
+                    <li>Find your profile and click the <strong>More actions</strong> button <span class="opacity-70">(the gear/menu icon)</span>.</li>
+                    <li>Select <strong>Export profile</strong> (Warning: Do not click delete!).</li>
+                    <li>Copy the entire string provided and <strong>paste it into the box below.</strong></li>
                 </ol>
             </div>
             
-            <textarea id="trpInput" rows="5" class="w-full bg-[var(--box-bg)] text-muted border border-[var(--box-border)] rounded p-4 focus:outline-none focus:border-[var(--text-accent)] font-mono text-xs shadow-inner mb-3 resize-none" placeholder="Paste TRP3 Export String Here..."></textarea>
-            <p id="errorMsg" class="text-red-500 text-sm font-semibold hidden mb-3"></p>
+            <label for="trpInput" class="input-label">Profile export string</label>
+            <textarea id="trpInput" aria-describedby="errorMsg" rows="5" class="w-full bg-[var(--box-bg)] text-muted border border-[var(--box-border)] rounded p-4 focus:outline-none focus:border-[var(--text-accent)] font-mono text-xs shadow-inner mb-3 resize-none" placeholder="Paste TRP3 Export String Here..."></textarea>
+            <p id="errorMsg" role="alert" class="text-red-500 text-sm font-semibold hidden mb-3"></p>
             
             <div class="flex justify-end gap-3 mt-2">
                 <button data-action="close-import" class="px-5 py-2 rounded text-[var(--text-muted)] hover:text-white transition">Cancel</button>
                 <button data-action="import" id="importBtn" class="trp-btn font-bold py-2 px-8 rounded transition duration-200 shadow-md">
-                    Load Data
+                    Open profile
                 </button>
             </div>
         </div>
     </div>
 
+    <main id="welcomeScreen" class="welcome" aria-labelledby="welcomeTitle">
+        <div class="welcome-copy">
+            <p class="eyebrow"><span></span> YOUR CHARACTER, BEYOND AZEROTH</p>
+            <h1 id="welcomeTitle">Every character<br>has a <em>story.</em></h1>
+            <p class="welcome-description">Bring yours to life. Open your Total RP 3 profile in a beautifully readable view, refine the details, and share it with your next adventure.</p>
+            <button data-action="open-import" class="primary-action"><i class="fa-solid fa-file-import" aria-hidden="true"></i> Import your profile <span aria-hidden="true">↗</span></button>
+            <p class="welcome-note">No account needed · Profiles decoded in your browser</p>
+        </div>
+        <div class="story-card" aria-hidden="true">
+            <div class="story-card-top"><span>THE CHARACTER ARCHIVE</span><span>✧</span></div>
+            <div class="story-emblem">✧</div>
+            <p class="story-kicker">A NEW CHAPTER AWAITS</p>
+            <h2>Your story starts here.</h2>
+            <div class="story-rule"></div>
+            <p>A name. A world. A thousand untold adventures.<br>Give your character a place on the page.</p>
+            <div class="story-card-bottom"><span>TOTAL RP 3</span><span>PROFILE VIEWER</span></div>
+        </div>
+        <div class="welcome-features">
+            <div><span class="feature-number">01</span><h3>Bring your character</h3><p>Paste an export string from Total RP 3 to open your profile.</p></div>
+            <div><span class="feature-number">02</span><h3>Make it your own</h3><p>Explore class themes, adjust your view, and edit the details.</p></div>
+            <div><span class="feature-number">03</span><h3>Share the adventure</h3><p>Export an image, copy for Discord, or take it back into game.</p></div>
+        </div>
+    </main>
     <!-- Main Output View -->
     <div class="w-full max-w-7xl flex flex-col gap-6 p-4 md:p-6 mt-2">
         <div id="outputArea" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch pb-10">
@@ -351,7 +366,7 @@
                 <!-- Character Identity Header -->
                 <div class="wow-panel flex flex-col">
                     <div class="wow-sidebar p-5 flex items-center gap-4 relative border-b border-[var(--box-border)]">
-                        <img id="outIcon" src="" class="w-16 h-16 rounded-md border-2 border-panel shadow-[0_0_10px_rgba(0,0,0,0.8)] object-cover hidden flex-shrink-0 editable-icon" onerror="this.onerror=null; this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg';">
+                        <img crossorigin="anonymous" id="outIcon" src="" class="w-16 h-16 rounded-md border-2 border-panel shadow-[0_0_10px_rgba(0,0,0,0.8)] object-cover hidden flex-shrink-0 editable-icon" onerror="this.onerror=null; this.src=TRP3.getIconUrl('');">
                         
                         <div class="flex flex-col gap-1.5 min-w-0 flex-grow text-left">
                             <h2 id="outName" class="text-xl sm:text-2xl font-extrabold tracking-tight text-accent break-words leading-tight editable-text w-full">Name</h2>
@@ -362,12 +377,12 @@
                     
                     <div class="p-4 flex-grow">
                         <h4 class="text-xs font-bold text-[#e6cc80] border-b border-box pb-1.5 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-address-card"></i> Basic Information
+                            <svg class="section-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M5 16c0-3 6-3 6 0m3-7h4m-4 4h4"/></svg> Basic Information
                         </h4>
                         <div id="outAttributes" class="grid grid-cols-1 gap-2.5 mb-5"></div>
 
                         <h4 class="text-xs font-bold text-[#e6cc80] border-b border-box pb-1.5 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-list-ul"></i> Additional Information
+                            <svg class="section-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3" cy="6" r=".5"/><circle cx="3" cy="12" r=".5"/><circle cx="3" cy="18" r=".5"/></svg> Additional Information
                         </h4>
                         <div id="outTraits" class="flex flex-col gap-3"></div>
                     </div>
@@ -376,7 +391,7 @@
                 <!-- Personality Traits -->
                 <div class="wow-panel p-5 hidden" id="personalityContainer">
                     <h4 class="text-xs font-bold text-[#e6cc80] border-b border-box pb-1.5 uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-scale-balanced"></i> Personality Traits
+                        <svg class="section-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v17m-5 1h10M4 7h16M4 7l-3 7h6L4 7zm16 0-3 7h6l-3-7z"/></svg> Personality Traits
                     </h4>
                     <div id="outPersonality" class="flex flex-col w-full gap-3"></div>
                 </div>
@@ -385,19 +400,20 @@
             <!-- Main Content Panel (About) -->
             <div id="mainContentPanel" class="lg:col-span-8 wow-panel flex flex-col relative border-t-0 h-full">
                 <!-- Tabs Toolbar -->
-                <div id="aboutToolbar" class="bg-[var(--sidebar-bg)] border-b border-[var(--box-border)] pt-4 px-4 flex justify-between items-end rounded-t-md">
-                    <div class="flex items-center gap-1">
-                        <button id="tabSimpleBtn" data-action="switch-view" data-view="simple" class="view-tab is-active">Simple View</button>
-                        <button id="tabInGameBtn" data-action="switch-view" data-view="ingame" class="view-tab">In-Game View</button>
+                <div id="aboutToolbar" class="about-toolbar ingame-mode">
+                    <span class="about-heading">About the character</span>
+                    <div class="view-switch" aria-label="Profile view">
+                        <button id="tabSimpleBtn" data-action="switch-view" data-view="simple" aria-pressed="false" class="view-tab">Reader view</button>
+                        <button id="tabInGameBtn" data-action="switch-view" data-view="ingame" aria-pressed="true" class="view-tab is-active">In-game style</button>
                     </div>
-                    <div id="fontControls" class="flex items-center gap-2 pb-2 pr-2 hidden sm:flex" data-export-ignore="true">
+                    <div id="fontControls" class="font-controls is-unavailable" aria-hidden="true" inert data-export-ignore="true">
                         <span class="text-xs text-muted font-bold">A</span>
-                        <input type="range" id="fontSlider" min="0.4" max="2.0" step="0.1" value="1.0" class="w-20 h-1 bg-box rounded-lg appearance-none cursor-pointer" title="Adjust Font Size">
+                        <input type="range" id="fontSlider" aria-label="Profile text size" min="0.4" max="2.0" step="0.1" value="1.0" class="w-20 h-1 bg-box rounded-lg appearance-none cursor-pointer" title="Adjust Font Size">
                         <span id="fontDisplay" class="text-[10px] text-muted font-mono font-bold w-6 text-right">1.0x</span>
                     </div>
                 </div>
 
-                <div id="outAbout" class="paper-texture trp-about leading-relaxed p-8 flex-grow rounded-b-md" style="font-size: 1rem;" title="Double click to edit TRP3 code in Edit Mode"></div>
+                <div id="outAbout" class="ingame-parchment-dark trp-about-ingame leading-relaxed p-8 flex-grow rounded-b-md" title="Double click to edit TRP3 code in Edit Mode"></div>
 
                 <textarea id="editAbout" class="hidden w-full bg-[#0a0604] text-[#c7b299] border-0 p-6 focus:outline-none focus:ring-0 font-mono text-sm resize-none rounded-b-md flex-grow shadow-inner" data-export-ignore="true"></textarea>
             </div>
@@ -405,9 +421,9 @@
     </div>
 
     <!-- WoW In-Game Simulation View Modal -->
-    <div id="inGameModal" class="fixed inset-0 bg-black/95 z-[200] hidden flex items-center justify-center p-4">
+    <div id="inGameModal" role="dialog" aria-modal="true" aria-label="In-game profile preview" class="fixed inset-0 bg-black/95 z-[200] hidden flex items-center justify-center p-4">
         <div class="relative w-full max-w-[950px] h-[650px] flex bg-[#160e09] border-[4px] border-[#3a2517] rounded shadow-[0_0_50px_rgba(0,0,0,1)]">
-            <button data-action="close-ingame" class="absolute -top-4 -right-4 bg-red-900 hover:bg-red-700 text-[#e2d5c5] border-2 border-[#d4a853] rounded-full w-8 h-8 flex items-center justify-center font-bold shadow-lg transition z-50">
+            <button data-action="close-ingame" aria-label="Close in-game preview" class="absolute -top-4 -right-4 bg-red-900 hover:bg-red-700 text-[#e2d5c5] border-2 border-[#d4a853] rounded-full w-8 h-8 flex items-center justify-center font-bold shadow-lg transition z-50">
                 <i class="fa-solid fa-xmark"></i>
             </button>
             
@@ -416,7 +432,7 @@
                 <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/%3E%3C/svg%3E');"></div>
                 
                 <div class="flex items-center gap-4 p-4 border-b-2 border-[#3a2517] bg-black/40 relative z-10">
-                    <img id="igIcon" class="w-[60px] h-[60px] rounded border border-[#d4a853] shadow-md object-cover" onerror="this.onerror=null; this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg';">
+                    <img crossorigin="anonymous" id="igIcon" class="w-[60px] h-[60px] rounded border border-[#d4a853] shadow-md object-cover" onerror="this.onerror=null; this.src=TRP3.getIconUrl('');">
                     <div class="min-w-0">
                         <h2 id="igName" class="text-[17px] font-bold text-[#f8b700] drop-shadow-md truncate"></h2>
                         <p id="igTitle" class="text-[11px] font-semibold text-[#c7b299] uppercase tracking-wider truncate mt-0.5"></p>
@@ -437,6 +453,7 @@
     </div>
 
     <!-- Application Scripts (load order matters) -->
+    <script src="assets.js"></script>
     <script src="theme.js"></script>
     <script src="format.js"></script>
     <script src="core.js"></script>
