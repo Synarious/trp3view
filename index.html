@@ -3,573 +3,444 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TRP3 Profile Decoder</title>
+    <title>TRP3 Profile Viewer</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Pako for Zlib/Deflate Decompression -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <!-- html-to-image for Image Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        body { 
-            background-color: #140d08; 
-            background-image: radial-gradient(circle at top center, #2e2014, #0a0604);
-            color: #e2d5c5; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        :root {
+            /* Default TRP3 Parchment Theme */
+            --page-grad-center: #2e2014;
+            --page-grad-edge: #0a0604;
+            --panel-bg: #2a1d12;
+            --panel-border: #0f0a06;
+            --sidebar-bg: #22160d;
+            --text-primary: #e2d5c5;
+            --text-accent: #ffd100;
+            --text-muted: #c7b299;
+            --box-bg: #120b06;
+            --box-border: #382618;
+            --box-hover: #4a3420;
+            --about-bg: #160e09;
         }
+
+        body { 
+            background-color: var(--page-grad-edge); 
+            background-image: radial-gradient(circle at top center, var(--page-grad-center), var(--page-grad-edge));
+            color: var(--text-primary); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        
         .wow-panel { 
-            background: #2a1d12; 
-            border: 2px solid #0f0a06; 
+            background: var(--panel-bg); 
+            border: 1px solid var(--box-border); 
             border-radius: 0.35rem; 
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 10px 15px -3px rgba(0,0,0,0.7); 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); 
         }
         .wow-sidebar { 
-            background: #22160d; 
-            border-right: 2px solid #0f0a06; 
-            box-shadow: inset -5px 0 15px rgba(0,0,0,0.4);
+            background: var(--sidebar-bg); 
+            border-right: 1px solid var(--box-border); 
         }
-        
-        /* TRP3 Specific Formatting classes - Tighter Margins & Warm Borders */
-        .trp-about h1 { font-size: 1.5rem; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #4a3420; padding-bottom: 0.25rem; color: #ffd100;}
-        .trp-about h2 { font-size: 1.25rem; font-weight: bold; margin-top: 0.85rem; margin-bottom: 0.25rem; color: #ffd100;}
-        .trp-about h3 { font-size: 1.1rem; font-weight: bold; margin-top: 0.75rem; margin-bottom: 0.25rem; color: #d1b075; }
-        .trp-about p { margin-top: 0.25rem; margin-bottom: 0.25rem; color: #e2d5c5; }
-        .trp-about a { color: #ffd100; text-decoration: underline; }
-        .trp-about a:hover { color: #fff5c2; }
 
-        /* Custom Scrollbar - Warm Theme */
+        .bg-box { background: var(--box-bg); border-color: var(--box-border); }
+        .text-accent { color: var(--text-accent); }
+        .text-muted { color: var(--text-muted); }
+        .border-panel { border-color: var(--panel-border); }
+        .border-box { border-color: var(--box-border); }
+        .hover-box:hover { background: var(--box-hover); border-color: var(--text-accent); }
+        
+        /* Card Layout Styles */
+        .card-box {
+            background-color: var(--box-bg);
+            border: 1px solid var(--box-border);
+            border-radius: 0.25rem;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 44px;
+        }
+
+        .card-text-wrapper {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+            flex-grow: 1;
+        }
+
+        .card-title-text {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-accent);
+            line-height: 1.2;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            word-break: break-word;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+        }
+
+        .card-value-text {
+            font-size: 12px;
+            font-weight: 500;
+            color: #ffffff;
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            word-break: break-word;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+        }
+
+        /* SVG Noise Paper Textures */
+        .paper-texture {
+            position: relative;
+            background-color: var(--about-bg);
+            border-bottom-left-radius: 0.35rem;
+            border-bottom-right-radius: 0.35rem;
+        }
+        .paper-texture::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            opacity: 0.08;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            pointer-events: none;
+            mix-blend-mode: screen;
+            z-index: 0;
+            border-bottom-left-radius: inherit;
+            border-bottom-right-radius: inherit;
+        }
+        .paper-texture > * { position: relative; z-index: 1; }
+
+        /* Dark TRP3 In-Game Paper Background */
+        .ingame-parchment-dark {
+            position: relative;
+            background-color: #161616;
+            border-bottom-left-radius: 0.35rem;
+            border-bottom-right-radius: 0.35rem;
+        }
+        .ingame-parchment-dark::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            opacity: 0.3;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+            pointer-events: none;
+            mix-blend-mode: screen;
+            z-index: 0;
+            border-bottom-left-radius: inherit;
+            border-bottom-right-radius: inherit;
+        }
+        .ingame-parchment-dark > * { position: relative; z-index: 1; }
+
+        /* TRP3 Formatting classes */
+        .trp-about::after { content: ""; display: table; clear: both; }
+        .trp-about h1 { font-size: 1.5em; font-weight: bold; margin-top: 0.6em; margin-bottom: 0.25em; border-bottom: 1px solid var(--box-border); padding-bottom: 0.2em; color: var(--text-accent); }
+        .trp-about h2 { font-size: 1.25em; font-weight: bold; margin-top: 0.5em; margin-bottom: 0.2em; color: var(--text-accent); }
+        .trp-about h3 { font-size: 1.1em; font-weight: bold; margin-top: 0.5em; margin-bottom: 0.2em; color: var(--text-muted); }
+        .trp-about p { margin-top: 0.15em; margin-bottom: 0.35em; color: var(--text-primary); line-height: 1.5; }
+        .trp-about a { color: var(--text-accent); text-decoration: underline; }
+        .trp-about a:hover { filter: brightness(1.2); }
+
+        /* In-Game (WoW client) About typography */
+        .trp-about-ingame {
+            font-family: Georgia, "Times New Roman", serif;
+            color: #d8c8a4;
+            font-size: 15px;
+            line-height: 1.45;
+        }
+        .trp-about-ingame::after { content: ""; display: table; clear: both; }
+        .trp-about-ingame h1 { font-size: 1.6em; font-weight: 700; margin: 0.4em 0 0.2em; color: #f8b700; text-shadow: 0 1px 2px #000; }
+        .trp-about-ingame h2 { font-size: 1.35em; font-weight: 700; margin: 0.5em 0 0.25em; color: #f0e6d2; text-shadow: 0 1px 2px #000; }
+        .trp-about-ingame h3 { font-size: 1.1em; font-weight: 700; margin: 0.7em 0 0.2em; color: #3fc7eb; }
+        .trp-about-ingame p { margin: 0.35em 0; }
+        .trp-about-ingame a { color: #4fc3f7; text-decoration: underline; }
+        /* Images are painted at their authored width/height (as the addon's
+           <img width height> does); cover trims when the source aspect
+           differs, matching how the client frames banner art. */
+        .trp-ig-img { object-fit: cover; }
+        /* The about column is pinned to the in-game frame width (550px) and
+           centred, so text/image proportions match the client. */
+        .trp-ingame-body { max-width: 550px; margin-left: auto; margin-right: auto; }
+        .trp-ingame-body::after { content: ""; display: table; clear: both; }
+
+        /* Edit Mode Styles */
+        body.edit-mode .editable-text {
+            border-bottom: 1px dashed rgba(255, 209, 0, 0.5);
+            cursor: text;
+            transition: all 0.2s;
+        }
+        body.edit-mode .editable-text:hover { background: rgba(255, 209, 0, 0.1); }
+        body.edit-mode .editable-icon { outline: 2px dashed rgba(255, 209, 0, 0.7); cursor: pointer; }
+        body.edit-mode #outAbout { outline: 2px dashed rgba(255, 209, 0, 0.5); cursor: pointer; }
+
+        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 10px; height: 10px; }
-        ::-webkit-scrollbar-track { background: #0f0a06; border-left: 1px solid #22160d; }
-        ::-webkit-scrollbar-thumb { background: #382618; border-radius: 2px; border: 1px solid #4a3420; }
-        ::-webkit-scrollbar-thumb:hover { background: #4a3420; }
+        ::-webkit-scrollbar-track { background: var(--panel-border); }
+        ::-webkit-scrollbar-thumb { background: var(--box-border); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--box-hover); }
 
         /* TRP3 Button Styling */
-        .trp-btn {
-            background: linear-gradient(to bottom, #5c3f22, #3b2713);
-            border: 1px solid #140d08;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5);
-            color: #ffd100;
+        .trp-btn { background: var(--box-bg); border: 1px solid var(--box-border); color: var(--text-accent); }
+        .trp-btn:hover { background: var(--box-hover); color: #fff; }
+
+        /* View Mode Tabs (single source of truth; toggled with .is-active) */
+        .view-tab {
+            background: transparent;
+            border: 1px solid transparent;
+            border-bottom: 0;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 700;
+            border-radius: 0.25rem 0.25rem 0 0;
+            position: relative;
+            z-index: 10;
+            transform: translateY(1px);
+            transition: color .2s, background .2s, border-color .2s;
         }
-        .trp-btn:hover {
-            background: linear-gradient(to bottom, #6d4b29, #4a3118);
-            color: #fff;
+        .view-tab:hover { color: #fff; }
+        .view-tab.is-active {
+            background: var(--about-bg);
+            border-color: var(--box-border);
+            color: var(--text-accent);
         }
+        #aboutToolbar.ingame-mode .view-tab.is-active {
+            background: #161616;
+            border-color: #3a2517;
+            color: #f8b700;
+        }
+
+        /* Pronoun badge beside the character name */
+        .pronoun-badge {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            margin-left: 0.6rem;
+            padding: 0.15rem 0.6rem;
+            font-size: 0.625rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            line-height: 1.2;
+            color: var(--text-muted);
+            background: var(--box-bg);
+            border: 1px solid var(--box-border);
+            border-radius: 9999px;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+            transform: translateY(-0.12em);
+            white-space: nowrap;
+        }
+
+        /* Dropdown Menus */
+        .dropdown-content { display: none; }
+        .dropdown-group:hover .dropdown-content { display: flex; }
+
+        * { outline: 0 !important; outline-offset: 0 !important; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col p-4 md:p-6 items-center">
+<body class="flex flex-col items-center">
 
-    <div class="w-full max-w-7xl flex flex-col gap-6">
-        
-        <!-- Header & Input Area -->
-        <div class="wow-panel p-5">
-            <div class="flex justify-between items-center mb-3">
-                <h1 class="text-2xl font-bold text-[#ffd100] drop-shadow-md"><i class="fa-solid fa-scroll mr-2 text-[#b58540]"></i>TRP3 Decoder</h1>
-                <button id="decodeBtn" class="trp-btn font-bold py-2 px-6 rounded transition duration-200">
-                    Decode Profile
+    <!-- Top Navigation Bar -->
+    <nav class="w-full bg-[var(--sidebar-bg)] border-b border-[var(--box-border)] shadow-lg z-40 sticky top-0" data-export-ignore="true">
+        <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-2">
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 fill-[var(--text-accent)]" viewBox="0 0 512 512"><path d="M336 0c-26.5 0-48 21.5-48 48v288c0 26.5 21.5 48 48 48h128c26.5 0 48-21.5 48-48V48c0-26.5-21.5-48-48-48H336zm128 336H336V48h128v288zM0 128c0-26.5 21.5-48 48-48h192v48H48v336h128V304h48v160c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V128z"/></svg>
+                <span class="font-bold text-[var(--text-primary)] tracking-wide">TRP3 Decoder</span>
+            </div>
+
+            <div class="flex items-center gap-6 text-sm font-medium">
+                <button data-action="open-import" class="trp-btn px-4 py-1.5 rounded font-bold shadow-md flex items-center gap-2 transition duration-200">
+                    <i class="fa-solid fa-file-import"></i> Import Profile
+                </button>
+
+                <div class="dropdown-group relative py-2 cursor-pointer">
+                    <span class="text-[var(--text-primary)] hover:text-[var(--text-accent)] transition">History ▼</span>
+                    <div class="dropdown-content absolute top-full left-0 bg-[var(--panel-bg)] border border-[var(--panel-border)] shadow-xl rounded w-56 flex-col z-50">
+                        <div id="historyList" class="max-h-48 overflow-y-auto">
+                            <p class="px-4 py-3 text-xs text-[var(--text-muted)] italic">No history yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dropdown-group relative py-2 cursor-pointer">
+                    <span class="text-[var(--text-primary)] hover:text-[var(--text-accent)] transition">Theme ▼</span>
+                    <div class="dropdown-content absolute top-full left-0 bg-[var(--panel-bg)] border border-[var(--panel-border)] shadow-xl rounded w-44 flex-col z-50 max-h-96 overflow-y-auto">
+                        <a href="#" data-action="apply-theme" data-theme="parchment" class="px-4 py-2 text-[var(--text-primary)] hover:bg-[var(--box-hover)] hover:text-white border-b border-[var(--box-border)]">Parchment (Default)</a>
+                        <a href="#" data-action="apply-theme" data-theme="death knight" class="px-4 py-2 text-[#C41E3A] hover:bg-[var(--box-hover)]">Death Knight</a>
+                        <a href="#" data-action="apply-theme" data-theme="demon hunter" class="px-4 py-2 text-[#A330C9] hover:bg-[var(--box-hover)]">Demon Hunter</a>
+                        <a href="#" data-action="apply-theme" data-theme="druid" class="px-4 py-2 text-[#FF7C0A] hover:bg-[var(--box-hover)]">Druid</a>
+                        <a href="#" data-action="apply-theme" data-theme="evoker" class="px-4 py-2 text-[#33937F] hover:bg-[var(--box-hover)]">Evoker</a>
+                        <a href="#" data-action="apply-theme" data-theme="hunter" class="px-4 py-2 text-[#ABD473] hover:bg-[var(--box-hover)]">Hunter</a>
+                        <a href="#" data-action="apply-theme" data-theme="mage" class="px-4 py-2 text-[#3FC7EB] hover:bg-[var(--box-hover)]">Mage</a>
+                        <a href="#" data-action="apply-theme" data-theme="monk" class="px-4 py-2 text-[#00FF98] hover:bg-[var(--box-hover)]">Monk</a>
+                        <a href="#" data-action="apply-theme" data-theme="paladin" class="px-4 py-2 text-[#F48CBA] hover:bg-[var(--box-hover)]">Paladin</a>
+                        <a href="#" data-action="apply-theme" data-theme="priest" class="px-4 py-2 text-[#FFFFFF] hover:bg-[var(--box-hover)]">Priest</a>
+                        <a href="#" data-action="apply-theme" data-theme="rogue" class="px-4 py-2 text-[#FFF468] hover:bg-[var(--box-hover)]">Rogue</a>
+                        <a href="#" data-action="apply-theme" data-theme="shaman" class="px-4 py-2 text-[#0070DE] hover:bg-[var(--box-hover)]">Shaman</a>
+                        <a href="#" data-action="apply-theme" data-theme="warlock" class="px-4 py-2 text-[#8788EE] hover:bg-[var(--box-hover)]">Warlock</a>
+                        <a href="#" data-action="apply-theme" data-theme="warrior" class="px-4 py-2 text-[#C79C6E] hover:bg-[var(--box-hover)]">Warrior</a>
+                        <a href="#" data-action="apply-theme" data-theme="alliance" class="px-4 py-2 text-[#4da6ff] hover:bg-[var(--box-hover)] border-t border-[var(--box-border)]">Alliance</a>
+                        <a href="#" data-action="apply-theme" data-theme="horde" class="px-4 py-2 text-[#ff4d4d] hover:bg-[var(--box-hover)]">Horde</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Secondary Navigation Bar -->
+    <div id="secondaryNav" class="w-full bg-[#120b06] border-b border-[var(--panel-border)] shadow-md z-30 hidden" data-export-ignore="true">
+        <div class="max-w-7xl mx-auto flex items-center justify-end px-6 py-2 gap-4">
+            <button data-action="open-ingame" class="text-xs font-bold text-[#e6cc80] hover:text-white px-3 py-1 rounded border border-[#e6cc80] hover:bg-[#e6cc80]/10 transition"><i class="fa-solid fa-gamepad mr-1"></i> In-Game View</button>
+            <button data-action="toggle-edit" id="editToggleBtn" class="text-xs font-bold text-[var(--text-muted)] hover:text-white px-3 py-1 rounded border border-transparent hover:border-[var(--box-border)] transition"><i class="fa-solid fa-pen mr-1"></i> Edit Mode</button>
+            <button data-action="export-trp3" class="text-xs font-bold text-green-400 hover:text-green-300 px-3 py-1 rounded border border-transparent hover:border-green-800 transition"><i class="fa-solid fa-code mr-1"></i> Export as TRP3 Import</button>
+            <div class="h-4 w-px bg-[var(--box-border)] mx-1"></div>
+            <button data-action="export-image" class="text-xs font-bold text-[var(--text-muted)] hover:text-white px-3 py-1 rounded border border-transparent hover:border-[var(--box-border)] transition"><i class="fa-solid fa-image mr-1"></i> PNG</button>
+            <button data-action="export-discord" class="text-xs font-bold text-[var(--text-muted)] hover:text-white px-3 py-1 rounded border border-transparent hover:border-[var(--box-border)] transition"><i class="fa-brands fa-discord mr-1"></i> Discord</button>
+        </div>
+    </div>
+
+    <!-- Import Modal Overlay -->
+    <div id="importModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] hidden px-4">
+        <div class="bg-[var(--panel-bg)] border-2 border-[var(--box-border)] rounded-lg p-6 max-w-2xl w-full shadow-2xl relative">
+            <button data-action="close-import" class="absolute top-4 right-4 text-[var(--text-muted)] hover:text-white transition">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            
+            <h2 class="text-2xl font-bold text-[var(--text-accent)] mb-4 flex items-center gap-3">
+                <i class="fa-solid fa-file-import"></i> Import Profile
+            </h2>
+            
+            <div class="bg-[var(--box-bg)] border border-[var(--box-border)] rounded p-5 mb-5 text-[var(--text-primary)] text-sm shadow-inner">
+                <p class="font-bold text-[var(--text-accent)] mb-2">How to export your TRP3 Profile:</p>
+                <ol class="list-decimal pl-5 text-[var(--text-muted)] space-y-1.5">
+                    <li>Open <strong>Total RP 3</strong> in-game and view your character profile.</li>
+                    <li>Click the <strong>More actions</strong> button <span class="opacity-70">(the gear/menu icon)</span>.</li>
+                    <li>Select <strong>Export profile</strong>.</li>
+                    <li>Copy the entire string provided and paste it into the box below.</li>
+                </ol>
+            </div>
+            
+            <textarea id="trpInput" rows="5" class="w-full bg-[var(--box-bg)] text-muted border border-[var(--box-border)] rounded p-4 focus:outline-none focus:border-[var(--text-accent)] font-mono text-xs shadow-inner mb-3 resize-none" placeholder="Paste TRP3 Export String Here..."></textarea>
+            <p id="errorMsg" class="text-red-500 text-sm font-semibold hidden mb-3"></p>
+            
+            <div class="flex justify-end gap-3 mt-2">
+                <button data-action="close-import" class="px-5 py-2 rounded text-[var(--text-muted)] hover:text-white transition">Cancel</button>
+                <button data-action="import" id="importBtn" class="trp-btn font-bold py-2 px-8 rounded transition duration-200 shadow-md">
+                    Load Data
                 </button>
             </div>
-            <textarea id="trpInput" rows="3" class="w-full bg-[#120b06] text-[#c7b299] border border-[#382618] rounded p-3 focus:outline-none focus:ring-1 focus:ring-[#ffd100] font-mono text-xs shadow-inner" placeholder="Paste TRP3 Export String Here..."></textarea>
-            <p id="errorMsg" class="text-red-500 mt-2 hidden text-sm font-semibold"></p>
         </div>
+    </div>
 
-        <!-- Output Display: Smart Layout Grid -->
-        <div id="outputArea" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            
-            <!-- Left Sidebar (Stats, Traits, Glances) -->
+    <!-- Main Output View -->
+    <div class="w-full max-w-7xl flex flex-col gap-6 p-4 md:p-6 mt-2">
+        <div id="outputArea" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch pb-10">
+            <!-- Left Sidebar -->
             <div class="lg:col-span-4 flex flex-col gap-6">
-                
-                <!-- Character Identity Header & Unified Glances Panel -->
-                <div class="wow-panel overflow-hidden">
-                    <!-- Horizontal Identity Layout -->
-                    <div class="wow-sidebar p-5 flex items-center gap-4 relative border-b border-[#140d08]">
-                        <img id="outIcon" src="" class="w-20 h-20 rounded-md border-2 border-[#140d08] shadow-[0_0_10px_rgba(0,0,0,0.8)] object-cover hidden flex-shrink-0" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'">
-                        <div class="flex flex-col items-start text-left min-w-0 w-full">
-                            <h2 id="outName" class="text-2xl font-extrabold tracking-tight drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] leading-tight mb-1 w-full" style="color: #ffd100;">Name</h2>
-                            <h3 id="outTitle" class="text-[11px] font-bold text-[#d1b075] uppercase tracking-widest mb-2.5 truncate w-full drop-shadow-sm">Title</h3>
-                            <p id="outSub" class="text-white text-[11px] font-medium bg-[#140d08] inline-block px-3 py-1 rounded border border-[#382618] shadow-inner whitespace-nowrap">Race • Class</p>
+                <!-- Character Identity Header -->
+                <div class="wow-panel flex flex-col">
+                    <div class="wow-sidebar p-5 flex items-center gap-4 relative border-b border-[var(--box-border)]">
+                        <img id="outIcon" src="" class="w-16 h-16 rounded-md border-2 border-panel shadow-[0_0_10px_rgba(0,0,0,0.8)] object-cover hidden flex-shrink-0 editable-icon" onerror="this.onerror=null; this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg';">
+                        
+                        <div class="flex flex-col gap-1.5 min-w-0 flex-grow text-left">
+                            <h2 id="outName" class="text-xl sm:text-2xl font-extrabold tracking-tight text-accent break-words leading-tight editable-text w-full">Name</h2>
+                            <div id="outPills" class="flex flex-wrap gap-2"></div>
+                            <h3 id="outTitle" class="text-xs font-bold text-muted uppercase tracking-wider break-words leading-tight mt-0.5 editable-text w-max">Title</h3>
                         </div>
                     </div>
                     
-                    <div class="p-4">
-                        <!-- Basic Attributes -->
-                        <h4 class="text-xs font-bold text-[#e6cc80] border-b border-[#382618] pb-1.5 uppercase tracking-wider mb-3 drop-shadow-sm"><i class="fa-solid fa-book mr-2"></i>Basic Information</h4>
-                        <div id="outAttributes" class="grid grid-cols-2 gap-2 mb-5">
-                            <!-- Populated via JS -->
-                        </div>
+                    <div class="p-4 flex-grow">
+                        <h4 class="text-xs font-bold text-[#e6cc80] border-b border-box pb-1.5 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-address-card"></i> Basic Information
+                        </h4>
+                        <div id="outAttributes" class="grid grid-cols-1 gap-2.5 mb-5"></div>
 
-                        <!-- Traits & Glances -->
-                        <h4 class="text-xs font-bold text-[#e6cc80] border-b border-[#382618] pb-1.5 uppercase tracking-wider mb-3 drop-shadow-sm"><i class="fa-solid fa-address-card mr-2"></i>Additional Information</h4>
-                        <div id="outTraits" class="flex flex-col gap-2">
-                            <!-- Populated via JS -->
-                        </div>
+                        <h4 class="text-xs font-bold text-[#e6cc80] border-b border-box pb-1.5 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-list-ul"></i> Additional Information
+                        </h4>
+                        <div id="outTraits" class="flex flex-col gap-3"></div>
                     </div>
                 </div>
 
                 <!-- Personality Traits -->
                 <div class="wow-panel p-5 hidden" id="personalityContainer">
-                    <h4 class="text-xs font-bold text-[#e6cc80] border-b border-[#382618] pb-1.5 uppercase tracking-wider mb-4 drop-shadow-sm"><i class="fa-solid fa-scale-balanced mr-2"></i>Personality Traits</h4>
-                    <div id="outPersonality" class="flex flex-col w-full gap-3">
-                        <!-- Populated via JS -->
-                    </div>
+                    <h4 class="text-xs font-bold text-[#e6cc80] border-b border-box pb-1.5 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-scale-balanced"></i> Personality Traits
+                    </h4>
+                    <div id="outPersonality" class="flex flex-col w-full gap-3"></div>
                 </div>
             </div>
 
-            <!-- Main Content (About Text) -->
-            <div class="lg:col-span-8 wow-panel flex flex-col" style="min-height: 600px;">
-                <!-- About Header Toolbar -->
-                <div class="bg-[#1b120b] border-b border-[#140d08] p-4 flex justify-between items-center rounded-t-md shadow-sm">
-                    <div class="flex gap-2">
-                        <button class="bg-[#2a1d12] border-t border-l border-r border-[#4a3420] text-[#ffd100] px-4 py-1 text-sm font-bold rounded-t shadow-[0_2px_0_#2a1d12] relative z-10">About</button>
+            <!-- Main Content Panel (About) -->
+            <div id="mainContentPanel" class="lg:col-span-8 wow-panel flex flex-col relative border-t-0 h-full">
+                <!-- Tabs Toolbar -->
+                <div id="aboutToolbar" class="bg-[var(--sidebar-bg)] border-b border-[var(--box-border)] pt-4 px-4 flex justify-between items-end rounded-t-md">
+                    <div class="flex items-center gap-1">
+                        <button id="tabSimpleBtn" data-action="switch-view" data-view="simple" class="view-tab is-active">Simple View</button>
+                        <button id="tabInGameBtn" data-action="switch-view" data-view="ingame" class="view-tab">In-Game View</button>
                     </div>
-                    
-                    <!-- View/Edit Controls -->
-                    <div class="flex gap-3 items-center">
-                        <div id="editorToolbar" class="hidden flex gap-2 items-center bg-[#140d08] px-3 py-1 rounded border border-[#382618]">
-                            <label class="text-xs text-[#d1b075]">Color:</label>
-                            <input type="color" id="colorPicker" value="#ffd100" class="w-6 h-6 border-0 cursor-pointer bg-transparent">
-                            <button id="applyColorBtn" class="text-xs bg-[#382618] hover:bg-[#4a3420] px-2 py-1 rounded text-white transition border border-[#140d08]" title="Wrap selection in color">
-                                Apply
-                            </button>
-                        </div>
-                        
-                        <button id="toggleEditBtn" class="text-sm trp-btn px-4 py-1.5 rounded font-medium transition flex items-center">
-                            <i class="fa-solid fa-pen mr-1.5 text-xs"></i> Edit Text
-                        </button>
+                    <div id="fontControls" class="flex items-center gap-2 pb-2 pr-2 hidden sm:flex" data-export-ignore="true">
+                        <span class="text-xs text-muted font-bold">A</span>
+                        <input type="range" id="fontSlider" min="0.4" max="2.0" step="0.1" value="1.0" class="w-20 h-1 bg-box rounded-lg appearance-none cursor-pointer" title="Adjust Font Size">
+                        <span id="fontDisplay" class="text-[10px] text-muted font-mono font-bold w-6 text-right">1.0x</span>
                     </div>
                 </div>
 
-                <!-- Rendered View -->
-                <div id="outAbout" class="trp-about text-[#e2d5c5] leading-relaxed p-6 overflow-y-auto">
-                    <!-- Populated via JS -->
-                </div>
+                <div id="outAbout" class="paper-texture trp-about leading-relaxed p-8 flex-grow rounded-b-md" style="font-size: 1rem;" title="Double click to edit TRP3 code in Edit Mode"></div>
 
-                <!-- Edit View -->
-                <textarea id="editAbout" class="hidden w-full h-full min-h-[500px] bg-[#120b06] text-[#c7b299] border-0 p-6 focus:outline-none focus:ring-0 font-mono text-sm resize-none shadow-inner"></textarea>
+                <textarea id="editAbout" class="hidden w-full bg-[#0a0604] text-[#c7b299] border-0 p-6 focus:outline-none focus:ring-0 font-mono text-sm resize-none rounded-b-md flex-grow shadow-inner" data-export-ignore="true"></textarea>
             </div>
         </div>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
+    <!-- WoW In-Game Simulation View Modal -->
+    <div id="inGameModal" class="fixed inset-0 bg-black/95 z-[200] hidden flex items-center justify-center p-4">
+        <div class="relative w-full max-w-[950px] h-[650px] flex bg-[#160e09] border-[4px] border-[#3a2517] rounded shadow-[0_0_50px_rgba(0,0,0,1)]">
+            <button data-action="close-ingame" class="absolute -top-4 -right-4 bg-red-900 hover:bg-red-700 text-[#e2d5c5] border-2 border-[#d4a853] rounded-full w-8 h-8 flex items-center justify-center font-bold shadow-lg transition z-50">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
             
-            let currentProfile = {};
-            let isEditing = false;
-
-            // --- Event Listeners Mapping ---
-            document.getElementById('decodeBtn').addEventListener('click', decodeProfile);
-            document.getElementById('toggleEditBtn').addEventListener('click', toggleEditMode);
-            document.getElementById('applyColorBtn').addEventListener('click', insertColorCode);
-
-            // Core Decoding Logic
-            function decodeProfile() {
-                const input = document.getElementById('trpInput').value;
-                const errorMsg = document.getElementById('errorMsg');
-                const outputArea = document.getElementById('outputArea');
-                errorMsg.classList.add('hidden');
-
-                try {
-                    let base64 = "";
-                    const lines = input.split('\n');
-                    for (let line of lines) {
-                        line = line.trim();
-                        if (!line || line.includes("TRP3 PROFILE") || line.includes(": ")) continue;
-                        base64 += line;
-                    }
-
-                    if (!base64 && input.includes("inventory")) base64 = input;
-                    else if (!base64) throw new Error("No valid Base64 payload found. Ensure the BEGIN/END tags are intact.");
-
-                    while (base64.length % 4 !== 0) base64 += '=';
-
-                    let decompressed;
-                    try {
-                        const binaryStr = window.atob(base64);
-                        const bytes = new Uint8Array(binaryStr.length);
-                        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                        try { decompressed = pako.inflateRaw(bytes); } 
-                        catch (e) { decompressed = pako.inflate(bytes); }
-                    } catch (err) {
-                        decompressed = new Uint8Array(base64.length);
-                        for (let i = 0; i < base64.length; i++) decompressed[i] = base64.charCodeAt(i) & 0xFF;
-                    }
-
-                    // Extract mixed types (Strings & Numbers) via robust LibSerialize decoder
-                    const tokens = extractLibSerializeTokens(decompressed);
-                    currentProfile = parseTRP3Data(tokens);
-                    
-                    if (!currentProfile.about || currentProfile.about.length < 50) {
-                        currentProfile.about = extractTRP3AboutText(decompressed);
-                    }
-
-                    renderProfile();
-                    outputArea.classList.remove('hidden');
-
-                } catch (err) {
-                    console.error(err);
-                    errorMsg.textContent = "Error decoding profile: " + err.message;
-                    errorMsg.classList.remove('hidden');
-                    outputArea.classList.add('hidden');
-                }
-            }
-
-            // --- Robust LibSerialize Decoder ---
-            function extractLibSerializeTokens(uint8Array) {
-                let tokens = [];
-                let i = 0;
-                while (i < uint8Array.length) {
-                    let byte = uint8Array[i];
-                    let len = 0, headerSize = 0, isString = false;
-
-                    if (byte >= 0x40 && byte <= 0x57) { len = byte - 0x40; headerSize = 1; isString = true; } 
-                    else if (byte === 0x58 && i + 1 < uint8Array.length) { len = uint8Array[i+1]; headerSize = 2; isString = true; } 
-                    else if (byte === 0x59 && i + 2 < uint8Array.length) { len = uint8Array[i+1] | (uint8Array[i+2] << 8); headerSize = 3; isString = true; } 
-                    else if (byte === 0x5A && i + 3 < uint8Array.length) { len = uint8Array[i+1] | (uint8Array[i+2] << 8) | (uint8Array[i+3] << 16); headerSize = 4; isString = true; }
-
-                    if (isString && len > 0 && i + headerSize + len <= uint8Array.length) {
-                        try {
-                            const strBytes = uint8Array.slice(i + headerSize, i + headerSize + len);
-                            const text = new TextDecoder('utf-8').decode(strBytes);
-                            tokens.push(text);
-                        } catch (e) {}
-                        i += headerSize + len;
-                    } else {
-                        tokens.push(byte);
-                        i++;
-                    }
-                }
-                return tokens;
-            }
-
-            function extractTRP3AboutText(uint8Array) {
-                const rawStr = new TextDecoder('utf-8', {fatal: false}).decode(uint8Array);
-                const textBlocks = rawStr.split(/[\x00-\x09\x0B-\x0C\x0E-\x1F]+/);
-                let bestBlock = "";
-                for (let block of textBlocks) {
-                    if (block.length > bestBlock.length && block.length > 50) bestBlock = block;
-                }
-                if (bestBlock) {
-                    const firstBrace = bestBlock.indexOf("{");
-                    if (firstBrace > 0 && firstBrace <= 5) bestBlock = bestBlock.substring(firstBrace);
-                }
-                return bestBlock.trim();
-            }
-
-            function scanAhead(tokens, startIndex, targetKey, maxLookahead = 15) {
-                for(let j = 1; j <= maxLookahead && startIndex + j < tokens.length; j++) {
-                    if (tokens[startIndex + j] === targetKey) {
-                        return tokens[startIndex + j + 1] !== undefined ? tokens[startIndex + j + 1] : "";
-                    }
-                }
-                return "";
-            }
-
-            // Mappings for Default TRP3 Traits
-            const TRP3_DEFAULTS = {
-                "1": { leftName: "Chaotic", rightName: "Lawful", leftIcon: "achievement_bg_returnxflags_def_wsg", rightIcon: "spell_holy_blessingofstrength" },
-                "2": { leftName: "Forgiving", rightName: "Vindictive", leftIcon: "spell_holy_blessedrecovery", rightIcon: "ability_rogue_nervesofsteel" },
-                "3": { leftName: "Truthful", rightName: "Deceitful", leftIcon: "inv_misc_orb_03", rightIcon: "inv_misc_mask_02" },
-                "4": { leftName: "Gentle", rightName: "Brutal", leftIcon: "inv_misc_herb_01", rightIcon: "ability_warrior_decisivestrike" },
-                "5": { leftName: "Cautious", rightName: "Impulsive", leftIcon: "spell_nature_shamanrage", rightIcon: "spell_fire_incinerate" },
-                "6": { leftName: "Ascetic", rightName: "Bon vivant", leftIcon: "inv_misc_food_11", rightIcon: "inv_misc_food_08" },
-                "7": { leftName: "Valorous", rightName: "Spineless", leftIcon: "spell_holy_heroism", rightIcon: "ability_hunter_pet_turtle" }
-            };
-
-            function parseTRP3Data(tokens) {
-                let profile = { 
-                    firstName: "", lastName: "", fullTitle: "", race: "", role: "", class: "", icon: "",
-                    attributes: [], traits: [], personality: [], about: "" 
-                };
+            <!-- Left Pane: Directory & Character Sidebar -->
+            <div class="w-[320px] border-r-[4px] border-[#3a2517] flex flex-col relative overflow-hidden shrink-0">
+                <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/%3E%3C/svg%3E');"></div>
                 
-                for (let i = 0; i < tokens.length; i++) {
-                    const s = tokens[i];
-                    if (typeof s !== 'string') continue;
-
-                    // Grab profile icon if found before attributes
-                    if (s === "IC" && typeof tokens[i+1] === "string" && !profile.icon && profile.attributes.length === 0 && profile.traits.length === 0) {
-                        profile.icon = tokens[i+1];
-                    }
-                    
-                    if (s === "FN") profile.firstName = tokens[i+1];
-                    if (s === "LN") profile.lastName = tokens[i+1];
-                    if (s === "PT" || s === "FT") profile.fullTitle = tokens[i+1];
-                    if (s === "RA") profile.race = tokens[i+1];
-                    if (s === "CL") profile.class = tokens[i+1];
-                    if (s === "RO") profile.role = tokens[i+1];
-                    if (s === "profileName" && !profile.firstName) profile.firstName = tokens[i+1];
-                    
-                    // Attributes & Icons
-                    if (s === "NA") {
-                        let attr = { 
-                            name: tokens[i+1], 
-                            value: scanAhead(tokens, i, "VA", 8),
-                            icon: scanAhead(tokens, i, "IC", 8)
-                        };
-                        if (attr.name && attr.value) profile.attributes.push(attr);
-                    }
-                    
-                    // Glances & Icons
-                    if (s === "TI") {
-                        let trait = { 
-                            title: tokens[i+1], 
-                            text: scanAhead(tokens, i, "TX", 8),
-                            icon: scanAhead(tokens, i, "IC", 8)
-                        };
-                        if (trait.title && !profile.traits.find(t => t.title === trait.title)) profile.traits.push(trait);
-                    }
-
-                    // Custom Personality Traits mapped via (lN, rN)
-                    if (s === "lN") {
-                        let pTrait = {
-                            leftName: tokens[i+1],
-                            rightName: scanAhead(tokens, i, "rN", 15),
-                            leftIcon: scanAhead(tokens, i, "lI", 15),
-                            rightIcon: scanAhead(tokens, i, "rI", 15),
-                            value: scanAhead(tokens, i, "v", 15)
-                        };
-                        if (pTrait.leftName && pTrait.rightName && !profile.personality.find(p => p.leftName === pTrait.leftName)) {
-                            profile.personality.push(pTrait);
-                        }
-                    }
-
-                    // Default Personality Traits mapped via standard IDs ("1", "2", etc.)
-                    if (TRP3_DEFAULTS[s]) {
-                        let val = tokens[i+1];
-                        if (typeof val === "number" && val >= 0 && val <= 4) {
-                            let pTrait = { ...TRP3_DEFAULTS[s], value: val };
-                            if (!profile.personality.find(p => p.leftName === pTrait.leftName)) {
-                                profile.personality.push(pTrait);
-                            }
-                        }
-                    }
-                    
-                    if (s.length > 50 && (s.includes("{h1") || s.includes("{col:"))) {
-                        if (s.length > profile.about.length) profile.about = s;
-                    }
-                }
+                <div class="flex items-center gap-4 p-4 border-b-2 border-[#3a2517] bg-black/40 relative z-10">
+                    <img id="igIcon" class="w-[60px] h-[60px] rounded border border-[#d4a853] shadow-md object-cover" onerror="this.onerror=null; this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg';">
+                    <div class="min-w-0">
+                        <h2 id="igName" class="text-[17px] font-bold text-[#f8b700] drop-shadow-md truncate"></h2>
+                        <p id="igTitle" class="text-[11px] font-semibold text-[#c7b299] uppercase tracking-wider truncate mt-0.5"></p>
+                    </div>
+                </div>
                 
-                profile.attributes = profile.attributes.filter((v,i,a) => a.findIndex(t=>(t.name === v.name)) === i);
-                return profile;
-            }
+                <div class="flex-grow overflow-y-auto custom-scrollbar p-4 relative z-10 space-y-6">
+                    <div id="igAttributes" class="space-y-2"></div>
+                    <div id="igTraits" class="space-y-2"></div>
+                </div>
+            </div>
 
-            function resolveClassColor(className) {
-                if(!className) return "#e2e8f0";
-                const map = {
-                    "death knight": "#C41E3A", "demon hunter": "#A330C9", "druid": "#FF7C0A",
-                    "evoker": "#33937F", "hunter": "#ABD473", "mage": "#3FC7EB",
-                    "monk": "#00FF98", "paladin": "#F48CBA", "priest": "#FFFFFF",
-                    "rogue": "#FFF468", "shaman": "#0070DE", "warlock": "#8788EE", "warrior": "#C79C6E"
-                };
-                const c = className.toLowerCase();
-                for(let k in map) { if(c.includes(k)) return map[k]; }
-                return "#e2e8f0"; 
-            }
+            <!-- Right Pane: Parchment "About" Content -->
+            <div class="flex-grow ingame-parchment overflow-y-auto custom-scrollbar p-10 text-[var(--text-primary)] relative z-10">
+                <div id="igAbout" class="trp-about-ingame text-[15px] font-medium max-w-[550px] mx-auto relative z-20"></div>
+            </div>
+        </div>
+    </div>
 
-            // Fallback WoW Class Icons
-            function getClassIcon(className) {
-                if(!className) return 'inv_misc_questionmark';
-                const map = {
-                    "death knight": "classicon_deathknight", "demon hunter": "classicon_demonhunter", "druid": "classicon_druid",
-                    "evoker": "classicon_evoker", "hunter": "classicon_hunter", "mage": "classicon_mage",
-                    "monk": "classicon_monk", "paladin": "classicon_paladin", "priest": "classicon_priest",
-                    "rogue": "classicon_rogue", "shaman": "classicon_shaman", "warlock": "classicon_warlock", "warrior": "classicon_warrior"
-                };
-                const c = className.toLowerCase();
-                for(let k in map) { if(c.includes(k)) return map[k]; }
-                return 'inv_misc_questionmark';
-            }
-
-            function getIconUrl(iconPath) {
-                if (!iconPath || typeof iconPath !== 'string') return 'https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg';
-                let name = iconPath.split('\\').pop().split('/').pop().toLowerCase();
-                name = name.replace(/\.(png|blp|jpg|jpeg)$/i, '');
-                return `https://wow.zamimg.com/images/wow/icons/large/${name}.jpg`;
-            }
-
-            // --- Render & Editor Logic ---
-
-            function formatTRPText(text) {
-                if (!text) return "<i class='text-[#b58540]'>No about information provided.</i>";
-                
-                text = text.replace(/\{img:.*?\}/gi, '').trim(); 
-                text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                
-                text = text.replace(/\{h1:c\}([\s\S]*?)\{\/h1\}/gi, '<h1 class="text-center">$1</h1>')
-                           .replace(/\{h1\}([\s\S]*?)\{\/h1\}/gi, '<h1>$1</h1>')
-                           .replace(/\{h2:c\}([\s\S]*?)\{\/h2\}/gi, '<h2 class="text-center">$1</h2>')
-                           .replace(/\{h2\}([\s\S]*?)\{\/h2\}/gi, '<h2>$1</h2>')
-                           .replace(/\{h3:c\}([\s\S]*?)\{\/h3\}/gi, '<h3 class="text-center">$1</h3>')
-                           .replace(/\{h3\}([\s\S]*?)\{\/h3\}/gi, '<h3>$1</h3>')
-                           .replace(/\{p:c\}([\s\S]*?)\{\/p\}/gi, '<p class="text-center">$1</p>')
-                           .replace(/\{p\}([\s\S]*?)\{\/p\}/gi, '<p>$1</p>');
-                           
-                text = text.replace(/\{col:([0-9a-fA-F]{6})\}/gi, '<span style="color: #$1">')
-                           .replace(/\{\/col\}/gi, '</span>')
-                           .replace(/\{link\*(.*?)\*(.*?)\}/gi, '<a href="$1" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-link text-xs"></i> $2</a>');
-
-                text = text.replace(/\n*(<\/?(?:h1|h2|h3|p)[^>]*>)\n*/gi, '$1');
-                text = text.replace(/\n\n/g, '<br><br>').replace(/\n/g, ' ');
-
-                return text;
-            }
-
-            function renderProfile() {
-                const p = currentProfile;
-
-                if (p.about) {
-                    p.about = p.about.replace(/(BBK|Eauras|Einventory|Echaracter)[\s\S]*$/s, '');
-                    p.about = p.about
-                        .replace(/\r\n/g, '\n').replace(/\r/g, '\n') 
-                        .replace(/\n[ \t]+\n/g, '\n\n')             
-                        .replace(/\n{3,}/g, '\n\n')                 
-                        .replace(/[ \t]{4,}/g, ' ')                 
-                        .trim();
-                }
-
-                const fullName = [p.firstName, p.lastName].filter(Boolean).join(" ");
-                const subTitleInfo = [p.race, (p.role || p.class)].filter(Boolean).join(" • ");
-                const cColor = resolveClassColor(p.class || p.role || "evoker"); 
-                
-                // Character Icon & Name
-                const nameEl = document.getElementById('outName');
-                nameEl.textContent = fullName || "Unknown Character";
-                // Only override name color if it's not the default gray, else use Gold
-                if(cColor !== "#e2e8f0") {
-                    nameEl.style.color = cColor;
-                }
-
-                const iconEl = document.getElementById('outIcon');
-                const iconName = p.icon || getClassIcon(p.class || p.role);
-                iconEl.src = getIconUrl(iconName);
-                iconEl.classList.remove('hidden');
-
-                const titleEl = document.getElementById('outTitle');
-                titleEl.textContent = p.fullTitle || "";
-                titleEl.style.display = p.fullTitle ? "block" : "none";
-
-                document.getElementById('outSub').textContent = subTitleInfo || "No identity details";
-
-                // Render Attributes & Wowhead Icons
-                const attrContainer = document.getElementById('outAttributes');
-                attrContainer.innerHTML = "";
-                p.attributes.forEach(attr => {
-                    const div = document.createElement('div');
-                    div.className = "flex items-center gap-2 bg-[#120b06] p-1.5 rounded border border-[#2b1c0e] overflow-hidden shadow-inner";
-                    div.innerHTML = `
-                        <img src="${getIconUrl(attr.icon)}" class="w-6 h-6 rounded border border-[#0f0a06] flex-shrink-0" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'">
-                        <div class="flex flex-col flex-grow min-w-0">
-                            <span class="text-[9px] text-[#ffd100] font-normal tracking-wide truncate">${attr.name}</span>
-                            <span class="text-xs text-white font-medium truncate drop-shadow-sm">${attr.value}</span>
-                        </div>
-                    `;
-                    attrContainer.appendChild(div);
-                });
-
-                // Render Glances & Wowhead Icons
-                const traitsContainer = document.getElementById('outTraits');
-                traitsContainer.innerHTML = "";
-                p.traits.forEach(trait => {
-                    if(!trait.title && !trait.text) return;
-                    const div = document.createElement('div');
-                    div.className = "p-2.5 rounded flex gap-3 items-start bg-[#160f09] border border-[#2b1c0e] hover:border-[#ffd100] transition-colors shadow-inner";
-                    div.innerHTML = `
-                        <img src="${getIconUrl(trait.icon)}" class="w-8 h-8 rounded border border-[#0f0a06] shadow flex-shrink-0" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'">
-                        <div class="flex flex-col min-w-0">
-                            <h5 class="font-bold text-[13px] text-[#ffd100] mb-0.5 truncate">${trait.title}</h5>
-                            <p class="text-[11px] text-[#c7b299] leading-snug">${trait.text || ''}</p>
-                        </div>
-                    `;
-                    traitsContainer.appendChild(div);
-                });
-
-                // Render Dual-Color Sliders 
-                const pContainer = document.getElementById('personalityContainer');
-                const pOutput = document.getElementById('outPersonality');
-                pOutput.innerHTML = "";
-                if (p.personality.length > 0) {
-                    pContainer.classList.remove("hidden");
-                    p.personality.forEach(pTrait => {
-                        
-                        let percent = 50;
-                        let val = parseFloat(pTrait.value);
-                        if (!isNaN(val)) {
-                            if (val >= 0 && val <= 4) percent = (val / 4) * 100;
-                            else if (val > 4 && val <= 100) percent = val;
-                        }
-
-                        const div = document.createElement('div');
-                        div.className = "flex items-center w-full gap-2 mb-1";
-                        div.innerHTML = `
-                            <span class="text-[11px] text-[#ffd100] w-16 text-right font-medium truncate drop-shadow-md" title="${pTrait.leftName}">${pTrait.leftName}</span>
-                            <img src="${getIconUrl(pTrait.leftIcon)}" class="w-6 h-6 rounded border border-[#0f0a06] shadow flex-shrink-0" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'">
-                            
-                            <div class="flex-grow flex h-2.5 rounded-sm overflow-hidden relative border border-[#0f0a06] shadow-inner bg-black">
-                                <div class="bg-gradient-to-r from-yellow-700 to-yellow-500 h-full" style="width: ${percent}%"></div>
-                                <div class="bg-gradient-to-r from-blue-700 to-blue-500 h-full" style="width: ${100 - percent}%"></div>
-                                <div class="absolute top-0 bottom-0 w-[2px] bg-white shadow left-0" style="margin-left: ${percent}%"></div>
-                            </div>
-
-                            <img src="${getIconUrl(pTrait.rightIcon)}" class="w-6 h-6 rounded border border-[#0f0a06] shadow flex-shrink-0" onerror="this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'">
-                            <span class="text-[11px] text-[#3fc7eb] w-16 text-left font-medium truncate drop-shadow-md" title="${pTrait.rightName}">${pTrait.rightName}</span>
-                        `;
-                        pOutput.appendChild(div);
-                    });
-                } else {
-                    pContainer.classList.add("hidden");
-                }
-
-                document.getElementById('outAbout').innerHTML = formatTRPText(p.about);
-                document.getElementById('editAbout').value = p.about;
-            }
-
-            function toggleEditMode() {
-                const outAbout = document.getElementById('outAbout');
-                const editAbout = document.getElementById('editAbout');
-                const toggleBtn = document.getElementById('toggleEditBtn');
-                const toolbar = document.getElementById('editorToolbar');
-
-                isEditing = !isEditing;
-
-                if (isEditing) {
-                    outAbout.classList.add('hidden');
-                    editAbout.classList.remove('hidden');
-                    toolbar.classList.remove('hidden');
-                    toolbar.classList.add('flex');
-                    toggleBtn.innerHTML = '<i class="fa-solid fa-save mr-1.5"></i> Save Text';
-                } else {
-                    currentProfile.about = editAbout.value;
-                    renderProfile(); 
-                    
-                    editAbout.classList.add('hidden');
-                    outAbout.classList.remove('hidden');
-                    toolbar.classList.add('hidden');
-                    toolbar.classList.remove('flex');
-                    toggleBtn.innerHTML = '<i class="fa-solid fa-pen mr-1.5"></i> Edit Text';
-                }
-            }
-
-            function insertColorCode() {
-                const textarea = document.getElementById('editAbout');
-                const picker = document.getElementById('colorPicker');
-                const colorHex = picker.value.replace('#', '');
-                
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const selectedText = textarea.value.substring(start, end);
-                
-                const insertText = `{col:${colorHex}}${selectedText}{/col}`;
-                
-                textarea.value = textarea.value.substring(0, start) + insertText + textarea.value.substring(end);
-                
-                if (start === end) {
-                    textarea.selectionStart = textarea.selectionEnd = start + 13;
-                } else {
-                    textarea.selectionStart = start;
-                    textarea.selectionEnd = start + insertText.length;
-                }
-                textarea.focus();
-            }
-        });
-    </script>
+    <!-- Application Scripts (load order matters) -->
+    <script src="theme.js"></script>
+    <script src="format.js"></script>
+    <script src="core.js"></script>
+    <script src="render.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

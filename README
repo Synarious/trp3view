@@ -1,0 +1,194 @@
+# TRP3 Profile Viewer
+
+A browser-only viewer for Total RP 3 (TRP3) character profiles. Paste a TRP3
+export string and it decodes the LibSerialize payload, then renders the profile
+in two styles: a clean **Simple View** and an **In-Game View** that mimics the
+WoW client.
+
+No build step. Open `index.html` directly.
+
+
+## File layout
+
+Scripts are plain (non-module) files that share one global namespace, `window.TRP3`.
+**Load order in `index.html` matters**, because each file attaches to `TRP3`:
+
+| Order | File | Responsibility |
+|-------|------|----------------|
+| 1 | `theme.js`  | Class themes, `TRP3.defaults`, `applyTheme`, shared state/actions bootstrap |
+| 2 | `format.js` | **Texture/icon resolution** + TRP3 markup formatter (Simple/In-Game) |
+| 3 | `core.js`   | LibSerialize token codec + token stream -> profile object parser |
+| 4 | `render.js` | View layer: modals, tabs, edit mode, DOM painting, `data-action` dispatch |
+| 5 | `app.js`    | Boot, import pipeline, history storage, exports (TRP3 / Discord / PNG) |
+
+Everything is wired through delegated `data-action` attributes (see `render.js`
+`dispatchAction`); no functions are attached to `window` directly.
+
+
+## Texture & icon resolution  (`format.js`)
+
+TRP3 markup and profile fields reference WoW textures by their **in-game path**,
+e.g. `Interface\QuestionFrame\answer-ChromieScenario-Hourglass`. Browsers can't
+load those paths, so they are mapped to two different public hosts.
+
+### The two hosts
+
+```js
+const ICON_CDN    = 'https://wow.zamimg.com/images/wow/icons/large/';
+const DEFAULT_ICON = ICON_CDN + 'inv_misc_questionmark.jpg';
+
+const TEXTURE_CDN = 'https://cdn.jsdelivr.net/gh/Gethe/wow-ui-textures@live/';
+```
+
+* **`ICON_CDN` (Wowhead)** - for spell/ability/item **icons**. Keyed by bare icon
+  *name*, `.jpg`, and **case-insensitive** (`getIconUrl` lowercases for you).
+* **`TEXTURE_CDN` (jsDelivr -> GitHub mirror)** - for everything else: banners,
+  backgrounds, frames, atlases, etc. `Gethe/wow-ui-textures` is a git mirror of
+  Blizzard's `Interface\` art already converted from `.blp` to `.png`, laid out
+  with the same folder tree. **Case-sensitive.**
+
+### Path mapping rules (`getTextureUrl`)
+
+Given an interface texture path:
+
+1. `\` -> `/`
+2. strip a leading `Interface/`
+3. strip any `.blp` / `.tga` / `.png` / `.jpg` extension
+4. append **`.PNG`** (the mirror always uses uppercase `.PNG`)
+
+```
+Interface\QuestionFrame\answer-ChromieScenario-Hourglass
+  -> https://cdn.jsdelivr.net/gh/Gethe/wow-ui-textures@live/QuestionFrame/answer-ChromieScenario-Hourglass.PNG
+
+Interface\TALENTFRAME\bg-mage-frost.blp
+  -> https://cdn.jsdelivr.net/gh/Gethe/wow-ui-textures@live/TALENTFRAME/bg-mage-frost.PNG
+```
+
+### Which host is used? (`isIconPath` / `resolveImageUrl`)
+
+A reference is treated as an **icon** when it has no folder (`inv_misc_gear_01`)
+or its **first** folder is `Icons\` (e.g. `Interface\Icons\...`). Everything else
+goes to the texture mirror - note this includes art folders that merely *contain*
+an `Icons` subfolder, such as `Interface\PVPFrame\Icons\prestige-icon-3-3`, which
+is interface art and 404s on the Wowhead icon CDN.
+
+`resolveImageUrl(path)` returns `{ src, fallback }`:
+
+| Input kind | `src` | `fallback` |
+|------------|-------|------------|
+| icon name / `Interface\Icons\...` | `ICON_CDN` | `DEFAULT_ICON` |
+| interface texture | `TEXTURE_CDN` | `ICON_CDN` (last resort) |
+
+`{img:...}` tags inside the About text are rendered with this resolver (in
+`formatInGameView`). Attribute, trait, personality, and portrait icons use
+`getIconUrl` directly, since those are always real icons.
+
+The emitted `<img>` has an inline `onerror` (`fallbackHandler`) that swaps to the
+fallback URL once, then hides the element if that also fails. `attrUrl` strips
+quote/angle characters so a hostile path cannot break out of the `src`/`onerror`
+attributes.
+
+### Textures missing from the mirror (`TEXTURE_OVERRIDES`)
+
+The `Gethe/wow-ui-textures` `live` branch is **frozen at 9.2.7 (Aug 2022)**, so
+any texture added in **Dragonflight or later** 404s there - most visibly the
+`Expansion09` loading screens. `format.js` keeps a small path -> URL override map
+for these:
+
+```js
+const TEXTURE_OVERRIDES = {
+  'glues/loadingscreens/expansion09/main/loadscreen_mappirate':
+      'https://warcraft.wiki.gg/images/Plunderstorm_loading_screen.jpg',
+};
+```
+
+Each override points at the **direct `/images/<File>` URL, not
+`Special:FilePath`** - the wiki returns `403` to browser user-agents on the
+redirect endpoint (which would make the `<img>` fall back to the question mark).
+
+* Keys are the path **normalised to lower-case**, `Interface\` stripped, no
+  extension (that's `normalizeTexturePath`).
+* `getTextureUrl` and `resolveImageUrl` consult the map first; an override that
+  fails falls back to `DEFAULT_ICON`.
+* Add entries at runtime with `TRP3.setTextureOverride(path, url)`.
+
+**Adding a new override.** There is no path-based PNG host for DF+ art. Options,
+best first: (1) find a direct `.jpg`/`.png` URL for that specific art (community
+wikis often have them, e.g. loading screens - use the plain `/images/<File>` URL);
+(2) fetch the raw `.blp` from **wago.tools** and convert it yourself. wago.tools
+exposes a CORS-enabled API:
+
+```bash
+# build -> fileDataID lookup needs the 150 MB community listfile (path;fdid):
+curl -sL https://github.com/wowdev/wow-listfile/releases/latest/download/community-listfile.csv
+# e.g. -> 5580542;interface/glues/loadingscreens/expansion09/main/loadscreen_mappirate.blp
+# then the file bytes (raw BLP, not PNG) with Access-Control-Allow-Origin: *:
+curl -s "https://wago.tools/api/casc/5580542" -o banner.blp
+```
+
+Because a path -> fdid lookup needs the full listfile and the result is a raw BLP
+(no server-side PNG conversion), a fully general DF+ resolver is **not
+implemented**; curated overrides are the intended stopgap.
+
+
+## Updating / maintaining the resolver
+
+**New game content (patches, expansions).** The mirror is frozen at 9.2.7, so
+textures newer than that will **404** - add a `TEXTURE_OVERRIDES` entry (above).
+Textures on or before 9.2.7 are served as-is; jsDelivr caches GitHub files for
+~7 days, so to force a refresh of one file:
+
+```bash
+curl "https://purge.jsdelivr.net/gh/Gethe/wow-ui-textures@live/QuestionFrame/answer-ChromieScenario-Hourglass.PNG"
+```
+
+If you need a frozen snapshot instead of `live`, pin a commit/tag in
+`TEXTURE_CDN` (`...wow-ui-textures@<sha>/`).
+
+**A texture 404s but exists in-game.** Almost always a **case mismatch**
+(`Icons` vs `ICONS`, `answer-...` vs `Answer-...`). Check the real filename via
+the GitHub API and keep the exact casing:
+
+```bash
+curl -s "https://api.github.com/repos/Gethe/wow-ui-textures/contents/QuestionFrame?ref=live" \
+  | grep -o '"name": "[^"]*"'
+```
+
+If a case-insensitive fallback is ever needed, the full tree is ~67k files / ~21 MB
+(`.../git/trees/live?recursive=1`) and could be fetched once and cached to build
+a lowercase-name -> real-path index. Not currently implemented.
+
+**Host is down or rate-limited.** Swap `TEXTURE_CDN` for another mirror; both are
+verified working with the same path layout:
+
+```js
+const TEXTURE_CDN = 'https://raw.githubusercontent.com/Gethe/wow-ui-textures/live/';
+const TEXTURE_CDN = 'https://cdn.jsdelivr.net/gh/syl404/wow-textures@live/';
+```
+
+**New icon fallback.** Change `DEFAULT_ICON` (currently
+`inv_misc_questionmark.jpg`). Wowhead icon paths are `<name>.jpg` under
+`ICON_CDN`; any spell/item icon name works.
+
+**TRP3's own textures are NOT on the mirror.** The addon ships its own art in
+`totalRP3/Resources/` (`.tga`/`.blp`/`.png`: `trp3logo`, the `ui-*` frame pieces,
+`ui-list-bullet-*`, the minimap `trp3minimap.tga`, etc.). If you need those,
+convert them to PNG and host/bundle them yourself, then special-case them in
+`resolveImageUrl` before the `TEXTURE_CDN` lookup.
+
+### Quick verification
+
+```bash
+# Should return: HTTP 200  image/png
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
+  -L "https://cdn.jsdelivr.net/gh/Gethe/wow-ui-textures@live/QuestionFrame/answer-ChromieScenario-Hourglass.PNG"
+```
+
+### Not yet implemented
+
+The profile's **About-frame tiled background** (`data.BK`, an index into TRP3's
+`tiledBackgrounds` list) is not rendered - `core.js` doesn't parse it yet. To add
+it, resolve the index to its `bgFile` and render it with `getTextureUrl` (it is a
+full interface texture, not an icon). Note this is separate from the About text's
+inline `{img:}` images, which *are* rendered (including the loading-screen banner
+via the override above).
